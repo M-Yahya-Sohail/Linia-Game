@@ -1,14 +1,22 @@
 import React, { useState, useContext } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, SafeAreaView } from 'react-native';
+import { StyleSheet, Text, View, TouchableOpacity, SafeAreaView, ActivityIndicator } from 'react-native';
 import { GameContext } from '../context/GameContext';
 
 export default function LevelSelection({ navigation }) {
-  const { highestUnlockedLevel, currentPlayingLevel, setCurrentPlayingLevel } = useContext(GameContext);
+  const { highestUnlockedLevel, currentPlayingLevel, setCurrentPlayingLevel, isLoaded } = useContext(GameContext);
   
   const [currentPage, setCurrentPage] = useState(0);
   const levelsPerPage = 25;
 
-  // Pagination Logic: Limit user to current unlocked page + 1 locked page
+  // Agar database load ho raha hai toh Loading spinner dikhao taake crash na ho
+  if (!isLoaded) {
+    return (
+      <View style={{ flex: 1, backgroundColor: '#121212', justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color="#00e5ff" />
+      </View>
+    );
+  }
+
   const maxUnlockedPage = Math.floor((highestUnlockedLevel - 1) / levelsPerPage);
   const allowedMaxPage = maxUnlockedPage + 1; 
 
@@ -25,7 +33,7 @@ export default function LevelSelection({ navigation }) {
 
   const handleLevelPress = (level) => {
     if (level <= highestUnlockedLevel) {
-      setCurrentPlayingLevel(level); // Update active level
+      setCurrentPlayingLevel(level);
       navigation.navigate('Gameplay');
     }
   };
@@ -44,7 +52,7 @@ export default function LevelSelection({ navigation }) {
         <View style={styles.grid}>
           {levels.map((level) => {
             const isUnlocked = level <= highestUnlockedLevel;
-            const isCurrent = level === currentPlayingLevel; // Highlight wo hoga jo kheil raha hai
+            const isCurrent = level === currentPlayingLevel;
             const isLocked = level > highestUnlockedLevel;
 
             return (
@@ -62,10 +70,7 @@ export default function LevelSelection({ navigation }) {
                 {isLocked ? (
                   <Text style={styles.lockedIcon}>🔒</Text>
                 ) : (
-                  <Text style={[
-                    styles.levelNumber,
-                    isCurrent && styles.textCurrent
-                  ]}>
+                  <Text style={[styles.levelNumber, isCurrent && styles.textCurrent]}>
                     {level}
                   </Text>
                 )}
@@ -76,21 +81,13 @@ export default function LevelSelection({ navigation }) {
       </View>
 
       <View style={styles.pagination}>
-        <TouchableOpacity 
-          style={[styles.pageBtn, currentPage === 0 && styles.pageBtnDisabled]} 
-          onPress={handlePrevPage}
-          disabled={currentPage === 0}
-        >
+        <TouchableOpacity style={[styles.pageBtn, currentPage === 0 && styles.pageBtnDisabled]} onPress={handlePrevPage} disabled={currentPage === 0}>
           <Text style={[styles.pageBtnText, currentPage === 0 && styles.pageTextDisabled]}>PREV</Text>
         </TouchableOpacity>
 
         <Text style={styles.pageIndicator}>PAGE {currentPage + 1}</Text>
 
-        <TouchableOpacity 
-          style={[styles.pageBtn, currentPage >= allowedMaxPage && styles.pageBtnDisabled]} 
-          onPress={handleNextPage}
-          disabled={currentPage >= allowedMaxPage} // Lock button if limit reached
-        >
+        <TouchableOpacity style={[styles.pageBtn, currentPage >= allowedMaxPage && styles.pageBtnDisabled]} onPress={handleNextPage} disabled={currentPage >= allowedMaxPage}>
           <Text style={[styles.pageBtnText, currentPage >= allowedMaxPage && styles.pageTextDisabled]}>NEXT</Text>
         </TouchableOpacity>
       </View>

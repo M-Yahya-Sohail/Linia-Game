@@ -1,9 +1,6 @@
-// src/utils/LevelGenerator.js
-
 const buildPath = (r, c, visited, path, targetLength, rows, cols) => {
   if (path.length === targetLength) return path;
 
-  // Directions: Right, Down, Left, Up (shuffled for randomness)
   const dirs = [[0, 1], [1, 0], [0, -1], [-1, 0]].sort(() => Math.random() - 0.5);
 
   for (let [dr, dc] of dirs) {
@@ -13,11 +10,8 @@ const buildPath = (r, c, visited, path, targetLength, rows, cols) => {
     if (nr >= 0 && nr < rows && nc >= 0 && nc < cols && !visited.has(nodeID)) {
       visited.add(nodeID);
       path.push([nr, nc]);
-      
       let result = buildPath(nr, nc, visited, path, targetLength, rows, cols);
       if (result) return result;
-      
-      // Backtrack
       visited.delete(nodeID);
       path.pop();
     }
@@ -26,30 +20,38 @@ const buildPath = (r, c, visited, path, targetLength, rows, cols) => {
 };
 
 export const generateLevel = (levelNumber) => {
-  // 1. DYNAMIC GRID SIZE: Starts at 3x3, increases by 1 every 15 levels, capped at 6x6
-  const size = Math.min(6, 3 + Math.floor((levelNumber - 1) / 15));
-  const rows = size;
-  const cols = size;
+  const sizeSequence = [
+    [3, 3], // Level 1 
+    [4, 3], // Level 2 
+    [3, 4], // Level 3 
+    [4, 4], // Level 4 
+    [5, 3], // Level 5 
+    [3, 5], // Level 6 
+    [4, 5], // Level 7 
+    [5, 4], // Level 8 
+    [5, 5], // Level 9 
+    [6, 4], // Level 10
+  ];
+
+  let rows, cols;
+  
+  if (levelNumber <= sizeSequence.length) {
+    [rows, cols] = sizeSequence[levelNumber - 1];
+  } else {
+    const hardSizes = sizeSequence.slice(3); 
+    const cycleIndex = (levelNumber - 1 - sizeSequence.length) % hardSizes.length;
+    [rows, cols] = hardSizes[cycleIndex];
+  }
+
   const totalNodes = rows * cols;
+  const minBlocks = Math.floor(totalNodes * 0.1);
+  const maxBlocks = Math.floor(totalNodes * 0.35);
+  const numBlocks = Math.floor(Math.random() * (maxBlocks - minBlocks + 1)) + minBlocks;
 
-  // 2. MAX BLOCKS LIMIT: Never block more than 35% of the board, otherwise it gets too restrictive/easy
-  const maxBlocksLimit = Math.floor(totalNodes * 0.35);
-
-  // 3. DIFFICULTY SCALING: Calculate progress within the current grid size (0 to 14)
-  const progressInCurrentSize = (levelNumber - 1) % 15; 
-  
-  // Base blocks scale up mathematically as you progress within the same grid size
-  let baseBlocks = Math.floor((progressInCurrentSize / 14) * maxBlocksLimit);
-  
-  // Add 0 or 1 extra block for slight randomness, ensuring it doesn't cross the max limit
-  let numBlocks = Math.min(maxBlocksLimit, baseBlocks + Math.floor(Math.random() * 2));
-
-  // Minimum required nodes to traverse
   const targetPathLength = totalNodes - numBlocks;
 
   while (true) {
-    let grid = Array(rows).fill(0).map(() => Array(cols).fill(1)); // Start with solid blocks
-    
+    let grid = Array(rows).fill(0).map(() => Array(cols).fill(1)); 
     let startRow = Math.floor(Math.random() * rows);
     let startCol = Math.floor(Math.random() * cols);
 
@@ -61,9 +63,9 @@ export const generateLevel = (levelNumber) => {
     if (validPath) {
       validPath.forEach(([r, c], index) => {
         if (index === 0) {
-          grid[r][c] = 2;
+          grid[r][c] = 2; 
         } else {
-          grid[r][c] = 0;
+          grid[r][c] = 0; 
         }
       });
       return grid; 
