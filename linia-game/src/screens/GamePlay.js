@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useContext } from "react";
 import {
   StyleSheet,
   Text,
@@ -8,9 +8,19 @@ import {
   PanResponder,
   Alert,
 } from "react-native";
+import { GameContext } from "../context/GameContext"; // Added Context Import for Real-Time Progression
 
 export default function Gameplay({ navigation }) {
+  // Access global state from Context
+  const {
+    highestUnlockedLevel,
+    setHighestUnlockedLevel,
+    currentPlayingLevel,
+    setCurrentPlayingLevel,
+  } = useContext(GameContext);
+
   // Matrix Rules: 0 = Path, 1 = Blocked (Red), 2 = Start Point (Highlighted)
+  // For testing, you can change level data here:
   const levelData = [
     [2, 0, 0],
     [0, 1, 0],
@@ -20,7 +30,7 @@ export default function Gameplay({ navigation }) {
   const [path, setPath] = useState([]);
   const pathRef = useRef([]);
 
-  const CELL_SIZE = 80;
+  const CELL_SIZE = 80; // Size including margins
 
   const totalValidNodes = levelData.flat().filter((cell) => cell !== 1).length;
 
@@ -28,10 +38,8 @@ export default function Gameplay({ navigation }) {
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: () => true,
-      // onPanResponderGrant tap (click) ko handle karta hai
       onPanResponderGrant: (evt) =>
         handleTouch(evt.nativeEvent.locationX, evt.nativeEvent.locationY),
-      // onPanResponderMove drag ko handle karta hai
       onPanResponderMove: (evt) =>
         handleTouch(evt.nativeEvent.locationX, evt.nativeEvent.locationY),
     }),
@@ -53,18 +61,18 @@ export default function Gameplay({ navigation }) {
     const nodeID = `${row}-${col}`;
     const currentPath = pathRef.current;
 
-    if (cellValue === 1) return;
-    if (currentPath.includes(nodeID)) return;
+    if (cellValue === 1) return; // Blocked
+    if (currentPath.includes(nodeID)) return; // No overlapping
 
     if (currentPath.length === 0) {
-      if (cellValue !== 2) return;
+      if (cellValue !== 2) return; // Must start at 'S'
     } else {
       const lastNode = currentPath[currentPath.length - 1];
       const [lastRow, lastCol] = lastNode.split("-").map(Number);
       const isAdjacent =
         Math.abs(lastRow - row) + Math.abs(lastCol - col) === 1;
 
-      if (!isAdjacent) return;
+      if (!isAdjacent) return; // Only adjacent allowed
     }
 
     const newPath = [...currentPath, nodeID];
@@ -72,15 +80,32 @@ export default function Gameplay({ navigation }) {
     setPath([...newPath]);
   };
 
+  // REAL-TIME PROGRESSION LOGIC
   useEffect(() => {
     if (path.length === totalValidNodes) {
       Alert.alert(
-        "Level Cleared!",
-        "You have successfully traversed the matrix.",
-        [{ text: "Awesome", onPress: handleReset }],
+        "LEVEL CLEARED!",
+        "You have successfully completed the Hamiltonian path.",
+        [
+          {
+            text: "NEXT LEVEL",
+            onPress: () => {
+              // Unlock next level if current is the highest unlocked
+              if (currentPlayingLevel === highestUnlockedLevel) {
+                setHighestUnlockedLevel((prev) => prev + 1);
+              }
+              // Jump to next level
+              setCurrentPlayingLevel((prev) => prev + 1);
+
+              // Reset path for the new level
+              pathRef.current = [];
+              setPath([]);
+            },
+          },
+        ],
       );
     }
-  }, [path]);
+  }, [path, currentPlayingLevel, highestUnlockedLevel]);
 
   const handleUndo = () => {
     if (pathRef.current.length === 0) return;
@@ -101,22 +126,36 @@ export default function Gameplay({ navigation }) {
           onPress={() => navigation.goBack()}
           style={styles.headerBtn}
         >
-          <Text style={styles.headerText}>← Back</Text>
+          <Text style={styles.headerText}>← BACK</Text>
         </TouchableOpacity>
-        <Text style={styles.levelText}>Level 1</Text>
+        {/* Dynamic Level Text */}
+        <Text style={styles.levelText}>LEVEL {currentPlayingLevel}</Text>
         <View style={{ width: 60 }} />
       </View>
 
-      {/* Container mein padding 0 kar di hai aur overflow hidden kiya hai taake coordinates exact accurately map hon */}
       <View style={styles.gridContainer} {...panResponder.panHandlers}>
         {levelData.map((row, rowIndex) => (
-          /* pointerEvents="none" ka magic yahan hai: yeh tap aur drag ko mix nahi hone dega */
           <View key={`row-${rowIndex}`} style={styles.row} pointerEvents="none">
             {row.map((cellValue, colIndex) => {
               const nodeID = `${rowIndex}-${colIndex}`;
-              const isSelected = path.includes(nodeID);
+              const pathIndex = path.indexOf(nodeID); // Position of node in path array
+              const isSelected = pathIndex !== -1;
               const isBlocked = cellValue === 1;
               const isStart = cellValue === 2;
+
+              let arrowSymbol = ""; // Calculation for what to show inside this node
+
+              if (isSelected && pathIndex > 0) {
+                // Calculate direction from PREVIOUS node in path to CURRENT node
+                const prevNodeID = path[pathIndex - 1];
+                const [prevRow, prevCol] = prevNodeID.split("-").map(Number);
+
+                // Compare to find movement direction
+                if (rowIndex < prevRow) arrowSymbol = "↑";
+                else if (rowIndex > prevRow) arrowSymbol = "↓";
+                else if (colIndex < prevCol) arrowSymbol = "←";
+                else if (colIndex > prevCol) arrowSymbol = "→";
+              }
 
               return (
                 <View key={`cell-${colIndex}`} style={styles.cell}>
@@ -126,12 +165,24 @@ export default function Gameplay({ navigation }) {
                       isSelected && styles.nodeSelected,
                       isBlocked && styles.nodeBlocked,
                       isStart && !isSelected && styles.nodeStart,
+                      isStart && isSelected && styles.nodeStartSelected, // Special styling for selected Start node
                     ]}
                   >
+                    {isBlocked && <Text style={styles.blockedText}>✕</Text>}
                     {isStart && !isSelected && (
                       <Text style={styles.startText}>S</Text>
                     )}
-                    {isBlocked && <Text style={styles.blockedText}>✕</Text>}
+                    {/* Show arrows on selected nodes (Except start node, because it's the first move) */}
+                    {isSelected &&
+                      !isBlocked &&
+                      !isStart &&
+                      arrowSymbol !== "" && (
+                        <Text style={styles.arrowText}>{arrowSymbol}</Text>
+                      )}
+                    {/* If selected Start node, "S" is better than arrows */}
+                    {isSelected && isStart && (
+                      <Text style={styles.startTextSelected}>S</Text>
+                    )}
                   </View>
                 </View>
               );
@@ -142,10 +193,10 @@ export default function Gameplay({ navigation }) {
 
       <View style={styles.controls}>
         <TouchableOpacity onPress={handleUndo} style={styles.controlBtn}>
-          <Text style={styles.controlText}>Undo</Text>
+          <Text style={styles.controlText}>UNDO</Text>
         </TouchableOpacity>
         <TouchableOpacity onPress={handleReset} style={styles.controlBtn}>
-          <Text style={styles.controlText}>Reset</Text>
+          <Text style={styles.controlText}>RESET</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -168,8 +219,18 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   headerBtn: { padding: 10 },
-  headerText: { color: "#888", fontSize: 16 },
-  levelText: { color: "#00e5ff", fontSize: 24, fontWeight: "bold" },
+  headerText: {
+    color: "#888",
+    fontSize: 16,
+    fontWeight: "bold",
+    letterSpacing: 1,
+  },
+  levelText: {
+    color: "#00e5ff",
+    fontSize: 24,
+    fontWeight: "bold",
+    letterSpacing: 2,
+  },
   gridContainer: {
     backgroundColor: "#1a1a1a",
     borderRadius: 15,
@@ -202,8 +263,15 @@ const styles = StyleSheet.create({
   },
   nodeBlocked: { backgroundColor: "#ff3366", borderColor: "#ff0033" },
   nodeStart: { borderColor: "#00ffcc", borderWidth: 3 },
+  nodeStartSelected: {
+    borderColor: "#fff",
+    borderWidth: 3,
+    backgroundColor: "#00e5ff",
+  }, // Style when S is part of path
   startText: { color: "#00ffcc", fontWeight: "bold", fontSize: 20 },
+  startTextSelected: { color: "#121212", fontWeight: "bold", fontSize: 20 }, // S text color when node is neon blue
   blockedText: { color: "#fff", fontWeight: "bold", fontSize: 24 },
+  arrowText: { color: "#121212", fontWeight: "bold", fontSize: 26 }, // Black arrow on neon background
   controls: { flexDirection: "row", gap: 20 },
   controlBtn: {
     paddingHorizontal: 30,
@@ -213,5 +281,10 @@ const styles = StyleSheet.create({
     minWidth: 120,
     alignItems: "center",
   },
-  controlText: { color: "#fff", fontSize: 18, fontWeight: "600" },
+  controlText: {
+    color: "#fff",
+    fontSize: 18,
+    fontWeight: "600",
+    letterSpacing: 1,
+  },
 });
