@@ -1,14 +1,27 @@
+// ==========================================
+// 1. IMPORTS & CONTEXT
+// ==========================================
 import React, { useState, useRef, useEffect, useContext } from "react";
-import { StyleSheet, Text, View, TouchableOpacity, SafeAreaView, PanResponder, Alert, Dimensions } from "react-native";
+import { StyleSheet, Text, View, TouchableOpacity, PanResponder, Alert, Dimensions, Platform, Modal } from "react-native";
+import { SafeAreaView } from 'react-native-safe-area-context'; 
 import { GameContext } from "../context/GameContext";
 import { generateLevel } from "../utils/LevelGenerator";
+import PauseMenu from "../components/PauseMenu"; // Naya Component Import Kiya!
 
 export default function Gameplay({ navigation }) {
   const { highestUnlockedLevel, setHighestUnlockedLevel, currentPlayingLevel, setCurrentPlayingLevel } = useContext(GameContext);
 
+  // ==========================================
+  // 2. STATE & REFERENCES
+  // ==========================================
   const [levelData, setLevelData] = useState([]);
   const [path, setPath] = useState([]);
   const [isLevelCleared, setIsLevelCleared] = useState(false); 
+  
+  // Pause & Settings States
+  const [isPaused, setIsPaused] = useState(false);
+  const [isSoundOn, setIsSoundOn] = useState(true);
+  const [isVibrationOn, setIsVibrationOn] = useState(true);
   
   const levelDataRef = useRef([]); 
   const cellSizeRef = useRef(80);
@@ -16,6 +29,9 @@ export default function Gameplay({ navigation }) {
   const isWinningRef = useRef(false); 
   const totalValidNodesRef = useRef(0); 
 
+  // ==========================================
+  // 3. LEVEL GENERATION & SIZING LOGIC
+  // ==========================================
   useEffect(() => {
     const newGrid = generateLevel(currentPlayingLevel);
     setLevelData(newGrid);
@@ -34,6 +50,9 @@ export default function Gameplay({ navigation }) {
   cellSizeRef.current = currentCellSize;
   const NODE_SIZE = currentCellSize * 0.75;
 
+  // ==========================================
+  // 4. TOUCH & DRAG LOGIC (PAN RESPONDER)
+  // ==========================================
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
@@ -44,7 +63,7 @@ export default function Gameplay({ navigation }) {
   ).current;
 
   const handleTouch = (x, y) => {
-    if (isWinningRef.current) return; 
+    if (isWinningRef.current || isPaused) return; 
     
     const currentGrid = levelDataRef.current;
     const size = cellSizeRef.current;
@@ -83,60 +102,90 @@ export default function Gameplay({ navigation }) {
     }
   };
 
-  // FIXED EFFECT: Clear the trigger state immediately inside the onPress event to stop double alerts
+  // ==========================================
+  // 5. WIN CONDITION (CROSS-PLATFORM ALERTS)
+  // ==========================================
   useEffect(() => {
     if (isLevelCleared) {
-      const timer = setTimeout(() => {
-        Alert.alert(
-          "LEVEL CLEARED!",
-          "You have successfully completed the Hamiltonian path.",
-          [
-            {
-              text: "NEXT LEVEL",
-              onPress: () => {
-                // Reset flag first before updating level to prevent loop trigger
-                setIsLevelCleared(false);
-                
-                if (currentPlayingLevel === highestUnlockedLevel) {
-                  setHighestUnlockedLevel((prev) => prev + 1);
-                }
-                setCurrentPlayingLevel((prev) => prev + 1);
+      if (Platform.OS === 'web') {
+        alert("LEVEL CLEARED!\n\nYou have successfully completed the Hamiltonian path.");
+        setIsLevelCleared(false);
+        if (currentPlayingLevel === highestUnlockedLevel) {
+          setHighestUnlockedLevel((prev) => prev + 1);
+        }
+        setCurrentPlayingLevel((prev) => prev + 1);
+      } else {
+        const timer = setTimeout(() => {
+          Alert.alert(
+            "LEVEL CLEARED!",
+            "You have successfully completed the Hamiltonian path.",
+            [
+              {
+                text: "NEXT LEVEL",
+                onPress: () => {
+                  setIsLevelCleared(false);
+                  if (currentPlayingLevel === highestUnlockedLevel) {
+                    setHighestUnlockedLevel((prev) => prev + 1);
+                  }
+                  setCurrentPlayingLevel((prev) => prev + 1);
+                },
               },
-            },
-          ],
-          { cancelable: false }
-        );
-      }, 100);
-
-      return () => clearTimeout(timer);
+            ],
+            { cancelable: false }
+          );
+        }, 100);
+        return () => clearTimeout(timer);
+      }
     }
-  }, [isLevelCleared]); // Removed level states from here to stop re-triggering on level change
+  }, [isLevelCleared, currentPlayingLevel, highestUnlockedLevel]);
 
+  // ==========================================
+  // 6. ACTION HANDLERS
+  // ==========================================
   const handleUndo = () => {
-    if (pathRef.current.length === 0 || isWinningRef.current) return;
+    if (pathRef.current.length === 0 || isWinningRef.current || isPaused) return;
     const newPath = pathRef.current.slice(0, -1);
     pathRef.current = newPath;
     setPath(newPath);
   };
 
   const handleReset = () => {
-    if (isWinningRef.current) return;
+    if (isWinningRef.current || isPaused) return;
     pathRef.current = [];
     setPath([]);
   };
 
+  const handleRestartFromPause = () => {
+    setIsPaused(false); 
+    pathRef.current = [];
+    setPath([]);
+  };
+
+  const handleMainMenuFromPause = () => {
+    setIsPaused(false);
+    navigation.navigate('MainMenu');
+  };
+
+  // ==========================================
+  // 7. MAIN RENDER (UI)
+  // ==========================================
   if (levelData.length === 0) return null;
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* HEADER */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerBtn}>
           <Text style={styles.headerText}>← BACK</Text>
         </TouchableOpacity>
         <Text style={styles.levelText}>LEVEL {currentPlayingLevel}</Text>
-        <View style={{ width: 60 }} />
+        
+        <TouchableOpacity onPress={() => setIsPaused(true)} style={styles.headerBtn}>
+          <Text style={styles.pauseBtnText}>|| PAUSE</Text>
+        </TouchableOpacity>
       </View>
 
+      {/* GRID CONTAINER */}
       <View style={styles.gridContainer} {...panResponder.panHandlers}>
         {levelData.map((row, rowIndex) => (
           <View key={`row-${rowIndex}`} style={styles.row} pointerEvents="none">
@@ -184,6 +233,7 @@ export default function Gameplay({ navigation }) {
         ))}
       </View>
 
+      {/* FOOTER CONTROLS */}
       <View style={styles.controls}>
         <TouchableOpacity onPress={handleUndo} style={styles.controlBtn}>
           <Text style={styles.controlText}>UNDO</Text>
@@ -192,15 +242,31 @@ export default function Gameplay({ navigation }) {
           <Text style={styles.controlText}>RESET</Text>
         </TouchableOpacity>
       </View>
+
+      {/* 8. PAUSE MENU COMPONENT */}
+      <PauseMenu 
+        isPaused={isPaused}
+        setIsPaused={setIsPaused}
+        isSoundOn={isSoundOn}
+        setIsSoundOn={setIsSoundOn}
+        isVibrationOn={isVibrationOn}
+        setIsVibrationOn={setIsVibrationOn}
+        onRestart={handleRestartFromPause}
+        onMainMenu={handleMainMenuFromPause}
+      />
     </SafeAreaView>
   );
 }
 
+// ==========================================
+// 9. STYLESHEET
+// ==========================================
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#121212", alignItems: "center", justifyContent: "space-between", paddingVertical: 50 },
-  header: { width: "100%", flexDirection: "row", justifyContent: "space-between", paddingHorizontal: 30, alignItems: "center" },
+  header: { width: "100%", flexDirection: "row", justifyContent: "space-between", paddingHorizontal: 20, alignItems: "center" },
   headerBtn: { padding: 10 },
-  headerText: { color: "#888", fontSize: 16, fontWeight: "bold", letterSpacing: 1 },
+  headerText: { color: "#888", fontSize: 14, fontWeight: "bold", letterSpacing: 1 },
+  pauseBtnText: { color: "#fff", fontSize: 14, fontWeight: "bold", letterSpacing: 1 },
   levelText: { color: "#00e5ff", fontSize: 24, fontWeight: "bold", letterSpacing: 2 },
   gridContainer: { backgroundColor: "#1a1a1a", borderRadius: 15, overflow: "hidden" },
   row: { flexDirection: "row" },
@@ -213,6 +279,6 @@ const styles = StyleSheet.create({
   blockedText: { color: "#fff", fontWeight: "bold", fontSize: 24 },
   arrowText: { color: "#121212", fontWeight: "bold", fontSize: 26 },
   controls: { flexDirection: "row", gap: 20 },
-  controlBtn: { paddingHorizontal: 30, paddingVertical: 15, backgroundColor: "#333", borderRadius: 10, minWidth: 120, alignItems: "center" },
-  controlText: { color: "#fff", fontSize: 18, fontWeight: "600", letterSpacing: 1 },
+  controlBtn: { paddingHorizontal: 30, paddingVertical: 15, backgroundColor: '#333', borderRadius: 10, minWidth: 120, alignItems: 'center' },
+  controlText: { color: "#fff", fontSize: 18, fontWeight: "600", letterSpacing: 1 }
 });

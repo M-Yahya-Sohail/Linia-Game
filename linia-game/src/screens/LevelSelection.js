@@ -1,34 +1,34 @@
-import React, { useState, useContext } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, SafeAreaView, ActivityIndicator } from 'react-native';
+import React, { useState, useEffect, useContext } from 'react';
+import { StyleSheet, Text, View, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { GameContext } from '../context/GameContext';
 
 export default function LevelSelection({ navigation }) {
   const { highestUnlockedLevel, currentPlayingLevel, setCurrentPlayingLevel, isLoaded } = useContext(GameContext);
   
-  const [currentPage, setCurrentPage] = useState(0);
   const levelsPerPage = 25;
+  const initialPage = Math.floor((currentPlayingLevel > 0 ? currentPlayingLevel - 1 : 0) / levelsPerPage);
+  const [currentPage, setCurrentPage] = useState(initialPage);
 
-  // Agar database load ho raha hai toh Loading spinner dikhao taake crash na ho
-  if (!isLoaded) {
-    return (
-      <View style={{ flex: 1, backgroundColor: '#121212', justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" color="#00e5ff" />
-      </View>
-    );
-  }
+  useEffect(() => {
+    setCurrentPage(initialPage);
+  }, [initialPage]);
 
-  const maxUnlockedPage = Math.floor((highestUnlockedLevel - 1) / levelsPerPage);
-  const allowedMaxPage = maxUnlockedPage + 1; 
-
+  const maxUnlockedPage = Math.floor((highestUnlockedLevel > 0 ? highestUnlockedLevel - 1 : 0) / levelsPerPage);
+  
   const startLevel = currentPage * levelsPerPage + 1;
   const levels = Array.from({ length: levelsPerPage }, (_, i) => startLevel + i);
 
   const handleNextPage = () => {
-    if (currentPage < allowedMaxPage) setCurrentPage(prev => prev + 1);
+    if (currentPage < maxUnlockedPage) {
+      setCurrentPage(prev => prev + 1);
+    }
   };
   
   const handlePrevPage = () => {
-    if (currentPage > 0) setCurrentPage(prev => prev - 1);
+    if (currentPage > 0) {
+      setCurrentPage(prev => prev - 1);
+    }
   };
 
   const handleLevelPress = (level) => {
@@ -37,6 +37,14 @@ export default function LevelSelection({ navigation }) {
       navigation.navigate('Gameplay');
     }
   };
+
+  if (!isLoaded) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#00e5ff" />
+      </View>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -81,14 +89,22 @@ export default function LevelSelection({ navigation }) {
       </View>
 
       <View style={styles.pagination}>
-        <TouchableOpacity style={[styles.pageBtn, currentPage === 0 && styles.pageBtnDisabled]} onPress={handlePrevPage} disabled={currentPage === 0}>
+        <TouchableOpacity 
+          style={[styles.pageBtn, currentPage === 0 && styles.pageBtnDisabled]} 
+          onPress={handlePrevPage} 
+          disabled={currentPage === 0}
+        >
           <Text style={[styles.pageBtnText, currentPage === 0 && styles.pageTextDisabled]}>PREV</Text>
         </TouchableOpacity>
 
         <Text style={styles.pageIndicator}>PAGE {currentPage + 1}</Text>
 
-        <TouchableOpacity style={[styles.pageBtn, currentPage >= allowedMaxPage && styles.pageBtnDisabled]} onPress={handleNextPage} disabled={currentPage >= allowedMaxPage}>
-          <Text style={[styles.pageBtnText, currentPage >= allowedMaxPage && styles.pageTextDisabled]}>NEXT</Text>
+        <TouchableOpacity 
+          style={[styles.pageBtn, currentPage >= maxUnlockedPage && styles.pageBtnDisabled]} 
+          onPress={handleNextPage} 
+          disabled={currentPage >= maxUnlockedPage}
+        >
+          <Text style={[styles.pageBtnText, currentPage >= maxUnlockedPage && styles.pageTextDisabled]}>NEXT</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -97,6 +113,7 @@ export default function LevelSelection({ navigation }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#121212', alignItems: 'center' },
+  loadingContainer: { flex: 1, backgroundColor: '#121212', justifyContent: 'center', alignItems: 'center' },
   header: { width: '100%', flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 30, paddingBottom: 20, alignItems: 'center' },
   backBtn: { padding: 10 },
   backText: { color: '#888', fontSize: 14, fontWeight: 'bold', letterSpacing: 1 },
