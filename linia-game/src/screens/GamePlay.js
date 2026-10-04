@@ -10,7 +10,6 @@ import {
   Vibration,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Audio } from "expo-av"; // <--- EXPO AUDIO IMPORT KIYA HAI
 import { GameContext } from "../context/GameContext";
 import { generateLevel } from "../utils/LevelGenerator";
 import PauseMenu from "../components/PauseMenu";
@@ -26,6 +25,8 @@ export default function Gameplay({ navigation }) {
     setIsSoundOn,
     isVibrationOn,
     setIsVibrationOn,
+    playClickSound,
+    playWinSound,
   } = useContext(GameContext);
 
   const [levelData, setLevelData] = useState([]);
@@ -39,35 +40,6 @@ export default function Gameplay({ navigation }) {
   const pathRef = useRef([]);
   const isWinningRef = useRef(false);
   const totalValidNodesRef = useRef(0);
-
-  // ==========================================
-  // SAFE AUDIO PLAYBACK SYSTEM (No Memory Leaks)
-  // ==========================================
-  const playSound = async (type) => {
-    // Agar setting se sound band hai, toh yahin se wapas mud jao
-    if (!isSoundOn) return;
-
-    try {
-      let audioSource;
-      if (type === "click") {
-        audioSource = require("../../assets/sounds/click.mp3");
-      } else if (type === "win") {
-        audioSource = require("../../assets/sounds/win.mp3");
-      }
-
-      const { sound } = await Audio.Sound.createAsync(audioSource);
-      await sound.playAsync();
-
-      // Jaise hi aawaz khatam ho, memory free kar do (Professional Approach)
-      sound.setOnPlaybackStatusUpdate((status) => {
-        if (status.didJustFinish) {
-          sound.unloadAsync();
-        }
-      });
-    } catch (error) {
-      console.log("Sound play error: ", error);
-    }
-  };
 
   useEffect(() => {
     const newGrid = generateLevel(currentPlayingLevel);
@@ -154,12 +126,12 @@ export default function Gameplay({ navigation }) {
       isWinningRef.current = true;
       setIsLevelCleared(true);
 
-      playSound("win"); // WIN SOUND
+      if (playWinSound) playWinSound();
       if (isVibrationOn && Platform.OS !== "web") {
         Vibration.vibrate([0, 100, 50, 100]); // Long reward vibration
       }
     } else {
-      playSound("click"); // NORMAL CLICK SOUND
+      if (playClickSound) playClickSound();
       if (isVibrationOn && Platform.OS !== "web") {
         Vibration.vibrate(35); // Small haptic tick
       }
@@ -182,7 +154,7 @@ export default function Gameplay({ navigation }) {
     pathRef.current = newPath;
     setPath(newPath);
 
-    playSound("click"); // Play sound on undo as well
+    if (playClickSound) playClickSound();
     if (isVibrationOn && Platform.OS !== "web") {
       Vibration.vibrate(20);
     }
@@ -379,9 +351,6 @@ export default function Gameplay({ navigation }) {
   );
 }
 
-// ==========================================
-// STYLESHEET (As it was, no changes)
-// ==========================================
 const styles = StyleSheet.create({
   container: {
     flex: 1,
