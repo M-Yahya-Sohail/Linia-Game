@@ -1,70 +1,113 @@
-// ==========================================
-// 1. IMPORTS & CONTEXT
-// ==========================================
 import React, { useState, useRef, useEffect, useContext } from "react";
-import { StyleSheet, Text, View, TouchableOpacity, PanResponder, Alert, Dimensions, Platform, Modal } from "react-native";
-import { SafeAreaView } from 'react-native-safe-area-context'; 
+import {
+  StyleSheet,
+  Text,
+  View,
+  TouchableOpacity,
+  PanResponder,
+  Dimensions,
+  Platform,
+  Vibration,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { Audio } from "expo-av"; // <--- EXPO AUDIO IMPORT KIYA HAI
 import { GameContext } from "../context/GameContext";
 import { generateLevel } from "../utils/LevelGenerator";
-import PauseMenu from "../components/PauseMenu"; // Naya Component Import Kiya!
+import PauseMenu from "../components/PauseMenu";
+import WinModal from "../components/WinModal";
 
 export default function Gameplay({ navigation }) {
-  const { highestUnlockedLevel, setHighestUnlockedLevel, currentPlayingLevel, setCurrentPlayingLevel } = useContext(GameContext);
+  const {
+    highestUnlockedLevel,
+    setHighestUnlockedLevel,
+    currentPlayingLevel,
+    setCurrentPlayingLevel,
+    isSoundOn,
+    setIsSoundOn,
+    isVibrationOn,
+    setIsVibrationOn,
+  } = useContext(GameContext);
 
-  // ==========================================
-  // 2. STATE & REFERENCES
-  // ==========================================
   const [levelData, setLevelData] = useState([]);
   const [path, setPath] = useState([]);
-  const [isLevelCleared, setIsLevelCleared] = useState(false); 
-  
-  // Pause & Settings States
+  const [isLevelCleared, setIsLevelCleared] = useState(false);
+  const [showWinModal, setShowWinModal] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
-  const [isSoundOn, setIsSoundOn] = useState(true);
-  const [isVibrationOn, setIsVibrationOn] = useState(true);
-  
-  const levelDataRef = useRef([]); 
+
+  const levelDataRef = useRef([]);
   const cellSizeRef = useRef(80);
   const pathRef = useRef([]);
-  const isWinningRef = useRef(false); 
-  const totalValidNodesRef = useRef(0); 
+  const isWinningRef = useRef(false);
+  const totalValidNodesRef = useRef(0);
 
   // ==========================================
-  // 3. LEVEL GENERATION & SIZING LOGIC
+  // SAFE AUDIO PLAYBACK SYSTEM (No Memory Leaks)
   // ==========================================
+  const playSound = async (type) => {
+    // Agar setting se sound band hai, toh yahin se wapas mud jao
+    if (!isSoundOn) return;
+
+    try {
+      let audioSource;
+      if (type === "click") {
+        audioSource = require("../../assets/sounds/click.mp3");
+      } else if (type === "win") {
+        audioSource = require("../../assets/sounds/win.mp3");
+      }
+
+      const { sound } = await Audio.Sound.createAsync(audioSource);
+      await sound.playAsync();
+
+      // Jaise hi aawaz khatam ho, memory free kar do (Professional Approach)
+      sound.setOnPlaybackStatusUpdate((status) => {
+        if (status.didJustFinish) {
+          sound.unloadAsync();
+        }
+      });
+    } catch (error) {
+      console.log("Sound play error: ", error);
+    }
+  };
+
   useEffect(() => {
     const newGrid = generateLevel(currentPlayingLevel);
     setLevelData(newGrid);
     levelDataRef.current = newGrid;
-    totalValidNodesRef.current = newGrid.flat().filter(cell => cell !== 1).length;
-    
+    totalValidNodesRef.current = newGrid
+      .flat()
+      .filter((cell) => cell !== 1).length;
+
     setPath([]);
     pathRef.current = [];
-    isWinningRef.current = false; 
-    setIsLevelCleared(false); 
+    isWinningRef.current = false;
+    setIsLevelCleared(false);
+    setShowWinModal(false);
   }, [currentPlayingLevel]);
 
   const screenWidth = Dimensions.get("window").width;
   const columns = levelData.length > 0 ? levelData[0].length : 3;
-  const currentCellSize = Math.min(80, Math.floor((screenWidth - 60) / columns));
+  const currentCellSize = Math.min(
+    85,
+    Math.floor((screenWidth - 40) / columns),
+  );
   cellSizeRef.current = currentCellSize;
-  const NODE_SIZE = currentCellSize * 0.75;
+  const NODE_SIZE = currentCellSize * 0.45;
+  const LINE_THICKNESS = 14;
 
-  // ==========================================
-  // 4. TOUCH & DRAG LOGIC (PAN RESPONDER)
-  // ==========================================
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: (evt) => handleTouch(evt.nativeEvent.locationX, evt.nativeEvent.locationY),
-      onPanResponderMove: (evt) => handleTouch(evt.nativeEvent.locationX, evt.nativeEvent.locationY),
-    })
+      onPanResponderGrant: (evt) =>
+        handleTouch(evt.nativeEvent.locationX, evt.nativeEvent.locationY),
+      onPanResponderMove: (evt) =>
+        handleTouch(evt.nativeEvent.locationX, evt.nativeEvent.locationY),
+    }),
   ).current;
 
   const handleTouch = (x, y) => {
-    if (isWinningRef.current || isPaused) return; 
-    
+    if (isWinningRef.current || isPaused || showWinModal) return;
+
     const currentGrid = levelDataRef.current;
     const size = cellSizeRef.current;
     const currentPath = pathRef.current;
@@ -74,79 +117,75 @@ export default function Gameplay({ navigation }) {
     const col = Math.floor(x / size);
     const row = Math.floor(y / size);
 
-    if (row < 0 || row >= currentGrid.length || col < 0 || col >= currentGrid[0].length) return;
+    if (
+      row < 0 ||
+      row >= currentGrid.length ||
+      col < 0 ||
+      col >= currentGrid[0].length
+    )
+      return;
 
     const cellValue = currentGrid[row][col];
     const nodeID = `${row}-${col}`;
 
-    if (cellValue === 1) return; 
-    if (currentPath.includes(nodeID)) return; 
+    if (cellValue === 1) return;
+    if (currentPath.includes(nodeID)) return;
 
     if (currentPath.length === 0) {
-      if (cellValue !== 2) return; 
+      if (cellValue !== 2) return;
     } else {
       const lastNode = currentPath[currentPath.length - 1];
       const [lastRow, lastCol] = lastNode.split("-").map(Number);
-      const isAdjacent = Math.abs(lastRow - row) + Math.abs(lastCol - col) === 1;
-      
-      if (!isAdjacent) return; 
+      const isAdjacent =
+        Math.abs(lastRow - row) + Math.abs(lastCol - col) === 1;
+
+      if (!isAdjacent) return;
     }
 
     const newPath = [...currentPath, nodeID];
     pathRef.current = newPath;
     setPath([...newPath]);
 
-    if (newPath.length === totalValidNodesRef.current && !isWinningRef.current) {
-      isWinningRef.current = true; 
-      setIsLevelCleared(true); 
+    // Check Win Condition First
+    if (
+      newPath.length === totalValidNodesRef.current &&
+      !isWinningRef.current
+    ) {
+      isWinningRef.current = true;
+      setIsLevelCleared(true);
+
+      playSound("win"); // WIN SOUND
+      if (isVibrationOn && Platform.OS !== "web") {
+        Vibration.vibrate([0, 100, 50, 100]); // Long reward vibration
+      }
+    } else {
+      playSound("click"); // NORMAL CLICK SOUND
+      if (isVibrationOn && Platform.OS !== "web") {
+        Vibration.vibrate(35); // Small haptic tick
+      }
     }
   };
 
-  // ==========================================
-  // 5. WIN CONDITION (CROSS-PLATFORM ALERTS)
-  // ==========================================
   useEffect(() => {
     if (isLevelCleared) {
-      if (Platform.OS === 'web') {
-        alert("LEVEL CLEARED!\n\nYou have successfully completed the Hamiltonian path.");
-        setIsLevelCleared(false);
-        if (currentPlayingLevel === highestUnlockedLevel) {
-          setHighestUnlockedLevel((prev) => prev + 1);
-        }
-        setCurrentPlayingLevel((prev) => prev + 1);
-      } else {
-        const timer = setTimeout(() => {
-          Alert.alert(
-            "LEVEL CLEARED!",
-            "You have successfully completed the Hamiltonian path.",
-            [
-              {
-                text: "NEXT LEVEL",
-                onPress: () => {
-                  setIsLevelCleared(false);
-                  if (currentPlayingLevel === highestUnlockedLevel) {
-                    setHighestUnlockedLevel((prev) => prev + 1);
-                  }
-                  setCurrentPlayingLevel((prev) => prev + 1);
-                },
-              },
-            ],
-            { cancelable: false }
-          );
-        }, 100);
-        return () => clearTimeout(timer);
-      }
+      const timer = setTimeout(() => {
+        setShowWinModal(true);
+      }, 350);
+      return () => clearTimeout(timer);
     }
-  }, [isLevelCleared, currentPlayingLevel, highestUnlockedLevel]);
+  }, [isLevelCleared]);
 
-  // ==========================================
-  // 6. ACTION HANDLERS
-  // ==========================================
   const handleUndo = () => {
-    if (pathRef.current.length === 0 || isWinningRef.current || isPaused) return;
+    if (pathRef.current.length === 0 || isWinningRef.current || isPaused)
+      return;
     const newPath = pathRef.current.slice(0, -1);
     pathRef.current = newPath;
     setPath(newPath);
+
+    playSound("click"); // Play sound on undo as well
+    if (isVibrationOn && Platform.OS !== "web") {
+      Vibration.vibrate(20);
+    }
   };
 
   const handleReset = () => {
@@ -156,36 +195,56 @@ export default function Gameplay({ navigation }) {
   };
 
   const handleRestartFromPause = () => {
-    setIsPaused(false); 
+    setIsPaused(false);
     pathRef.current = [];
     setPath([]);
   };
 
   const handleMainMenuFromPause = () => {
     setIsPaused(false);
-    navigation.navigate('MainMenu');
+    navigation.navigate("MainMenu");
   };
 
-  // ==========================================
-  // 7. MAIN RENDER (UI)
-  // ==========================================
+  const handleNextLevel = () => {
+    setShowWinModal(false);
+    setIsLevelCleared(false);
+    if (currentPlayingLevel === highestUnlockedLevel) {
+      setHighestUnlockedLevel((prev) => prev + 1);
+    }
+    setCurrentPlayingLevel((prev) => prev + 1);
+  };
+
+  const handleMainMenuFromWin = () => {
+    setShowWinModal(false);
+    setIsLevelCleared(false);
+    if (currentPlayingLevel === highestUnlockedLevel) {
+      setHighestUnlockedLevel((prev) => prev + 1);
+    }
+    navigation.navigate("MainMenu");
+  };
+
   if (levelData.length === 0) return null;
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* HEADER */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerBtn}>
-          <Text style={styles.headerText}>← BACK</Text>
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          style={styles.iconBtn}
+        >
+          <Text style={styles.iconBtnText}>←</Text>
         </TouchableOpacity>
-        <Text style={styles.levelText}>LEVEL {currentPlayingLevel}</Text>
-        
-        <TouchableOpacity onPress={() => setIsPaused(true)} style={styles.headerBtn}>
-          <Text style={styles.pauseBtnText}>|| PAUSE</Text>
+        <View style={styles.levelBadge}>
+          <Text style={styles.levelText}>LEVEL {currentPlayingLevel}</Text>
+        </View>
+        <TouchableOpacity
+          onPress={() => setIsPaused(true)}
+          style={styles.iconBtn}
+        >
+          <Text style={styles.iconBtnText}>॥</Text>
         </TouchableOpacity>
       </View>
 
-      {/* GRID CONTAINER */}
       <View style={styles.gridContainer} {...panResponder.panHandlers}>
         {levelData.map((row, rowIndex) => (
           <View key={`row-${rowIndex}`} style={styles.row} pointerEvents="none">
@@ -196,35 +255,89 @@ export default function Gameplay({ navigation }) {
               const isBlocked = cellValue === 1;
               const isStart = cellValue === 2;
 
-              let arrowSymbol = "";
+              let lineStyle = null;
               if (isSelected && pathIndex > 0) {
                 const prevNodeID = path[pathIndex - 1];
                 const [prevRow, prevCol] = prevNodeID.split("-").map(Number);
-                if (rowIndex < prevRow) arrowSymbol = "↑";
-                else if (rowIndex > prevRow) arrowSymbol = "↓";
-                else if (colIndex < prevCol) arrowSymbol = "←";
-                else if (colIndex > prevCol) arrowSymbol = "→";
+                if (rowIndex < prevRow)
+                  lineStyle = {
+                    top: "50%",
+                    left: "50%",
+                    height: currentCellSize,
+                    width: LINE_THICKNESS,
+                    marginLeft: -LINE_THICKNESS / 2,
+                  };
+                else if (rowIndex > prevRow)
+                  lineStyle = {
+                    bottom: "50%",
+                    left: "50%",
+                    height: currentCellSize,
+                    width: LINE_THICKNESS,
+                    marginLeft: -LINE_THICKNESS / 2,
+                  };
+                else if (colIndex < prevCol)
+                  lineStyle = {
+                    top: "50%",
+                    left: "50%",
+                    width: currentCellSize,
+                    height: LINE_THICKNESS,
+                    marginTop: -LINE_THICKNESS / 2,
+                  };
+                else if (colIndex > prevCol)
+                  lineStyle = {
+                    top: "50%",
+                    right: "50%",
+                    width: currentCellSize,
+                    height: LINE_THICKNESS,
+                    marginTop: -LINE_THICKNESS / 2,
+                  };
               }
 
               return (
-                <View key={`cell-${colIndex}`} style={{ width: currentCellSize, height: currentCellSize, justifyContent: "center", alignItems: "center" }}>
+                <View
+                  key={`cell-${colIndex}`}
+                  style={{
+                    width: currentCellSize,
+                    height: currentCellSize,
+                    justifyContent: "center",
+                    alignItems: "center",
+                  }}
+                >
+                  {lineStyle && <View style={[styles.pathLine, lineStyle]} />}
                   <View
                     style={[
-                      { width: NODE_SIZE, height: NODE_SIZE, borderRadius: NODE_SIZE / 2, backgroundColor: "#2a2a2a", borderWidth: 2, borderColor: "#444", justifyContent: "center", alignItems: "center" },
+                      styles.baseNode,
+                      {
+                        width: NODE_SIZE,
+                        height: NODE_SIZE,
+                        borderRadius: NODE_SIZE / 2,
+                      },
                       isSelected && styles.nodeSelected,
                       isBlocked && styles.nodeBlocked,
                       isStart && !isSelected && styles.nodeStart,
                       isStart && isSelected && styles.nodeStartSelected,
                     ]}
                   >
-                    {isBlocked && <Text style={styles.blockedText}>✕</Text>}
-                    {isStart && !isSelected && <Text style={styles.startText}>S</Text>}
-                    {isSelected && !isBlocked && !isStart && arrowSymbol !== "" && (
-                      <Text style={styles.arrowText}>{arrowSymbol}</Text>
+                    {isBlocked && (
+                      <View style={styles.crossContainer}>
+                        <View
+                          style={[
+                            styles.crossLine,
+                            { transform: [{ rotate: "45deg" }] },
+                          ]}
+                        />
+                        <View
+                          style={[
+                            styles.crossLine,
+                            { transform: [{ rotate: "-45deg" }] },
+                          ]}
+                        />
+                      </View>
                     )}
-                    {isSelected && isStart && (
-                      <Text style={styles.startTextSelected}>S</Text>
+                    {isStart && !isSelected && (
+                      <View style={styles.startCore} />
                     )}
+                    {isSelected && <View style={styles.selectedCore} />}
                   </View>
                 </View>
               );
@@ -233,18 +346,19 @@ export default function Gameplay({ navigation }) {
         ))}
       </View>
 
-      {/* FOOTER CONTROLS */}
       <View style={styles.controls}>
         <TouchableOpacity onPress={handleUndo} style={styles.controlBtn}>
           <Text style={styles.controlText}>UNDO</Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={handleReset} style={styles.controlBtn}>
-          <Text style={styles.controlText}>RESET</Text>
+        <TouchableOpacity
+          onPress={handleReset}
+          style={styles.controlBtnSecondary}
+        >
+          <Text style={styles.controlTextSecondary}>RESET</Text>
         </TouchableOpacity>
       </View>
 
-      {/* 8. PAUSE MENU COMPONENT */}
-      <PauseMenu 
+      <PauseMenu
         isPaused={isPaused}
         setIsPaused={setIsPaused}
         isSoundOn={isSoundOn}
@@ -254,31 +368,183 @@ export default function Gameplay({ navigation }) {
         onRestart={handleRestartFromPause}
         onMainMenu={handleMainMenuFromPause}
       />
+
+      <WinModal
+        visible={showWinModal}
+        currentLevel={currentPlayingLevel}
+        onNextLevel={handleNextLevel}
+        onMainMenu={handleMainMenuFromWin}
+      />
     </SafeAreaView>
   );
 }
 
 // ==========================================
-// 9. STYLESHEET
+// STYLESHEET (As it was, no changes)
 // ==========================================
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#121212", alignItems: "center", justifyContent: "space-between", paddingVertical: 50 },
-  header: { width: "100%", flexDirection: "row", justifyContent: "space-between", paddingHorizontal: 20, alignItems: "center" },
-  headerBtn: { padding: 10 },
-  headerText: { color: "#888", fontSize: 14, fontWeight: "bold", letterSpacing: 1 },
-  pauseBtnText: { color: "#fff", fontSize: 14, fontWeight: "bold", letterSpacing: 1 },
-  levelText: { color: "#00e5ff", fontSize: 24, fontWeight: "bold", letterSpacing: 2 },
-  gridContainer: { backgroundColor: "#1a1a1a", borderRadius: 15, overflow: "hidden" },
+  container: {
+    flex: 1,
+    backgroundColor: "#09090b",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 40,
+  },
+  header: {
+    width: "100%",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingHorizontal: 25,
+    alignItems: "center",
+    marginBottom: 20,
+  },
+  iconBtn: {
+    width: 45,
+    height: 45,
+    backgroundColor: "#18181b",
+    borderRadius: 25,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#27272a",
+  },
+  iconBtnText: { color: "#a1a1aa", fontSize: 18, fontWeight: "bold" },
+  levelBadge: {
+    backgroundColor: "rgba(0, 240, 255, 0.1)",
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "rgba(0, 240, 255, 0.3)",
+  },
+  levelText: {
+    color: "#00f0ff",
+    fontSize: 18,
+    fontWeight: "900",
+    letterSpacing: 4,
+  },
+  gridContainer: {
+    backgroundColor: "#121214",
+    padding: 20,
+    borderRadius: 30,
+    borderWidth: 1,
+    borderColor: "#27272a",
+    shadowColor: "#000",
+    shadowOpacity: 0.5,
+    shadowRadius: 20,
+    elevation: 15,
+  },
   row: { flexDirection: "row" },
-  nodeSelected: { backgroundColor: "#00e5ff", borderColor: "#fff", shadowColor: "#00e5ff", shadowOpacity: 0.8, shadowRadius: 10, elevation: 10 },
-  nodeBlocked: { backgroundColor: "#ff3366", borderColor: "#ff0033" },
-  nodeStart: { borderColor: "#00ffcc", borderWidth: 3 },
-  nodeStartSelected: { borderColor: "#fff", borderWidth: 3, backgroundColor: "#00e5ff" },
-  startText: { color: "#00ffcc", fontWeight: "bold", fontSize: 20 },
-  startTextSelected: { color: "#121212", fontWeight: "bold", fontSize: 20 },
-  blockedText: { color: "#fff", fontWeight: "bold", fontSize: 24 },
-  arrowText: { color: "#121212", fontWeight: "bold", fontSize: 26 },
-  controls: { flexDirection: "row", gap: 20 },
-  controlBtn: { paddingHorizontal: 30, paddingVertical: 15, backgroundColor: '#333', borderRadius: 10, minWidth: 120, alignItems: 'center' },
-  controlText: { color: "#fff", fontSize: 18, fontWeight: "600", letterSpacing: 1 }
+  baseNode: {
+    backgroundColor: "#18181b",
+    borderWidth: 2,
+    borderColor: "#27272a",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 2,
+  },
+  pathLine: {
+    position: "absolute",
+    backgroundColor: "#00f0ff",
+    borderRadius: 10,
+    shadowColor: "#00f0ff",
+    shadowOpacity: 0.9,
+    shadowRadius: 12,
+    elevation: 8,
+    zIndex: 1,
+  },
+  nodeSelected: {
+    backgroundColor: "#00f0ff",
+    borderColor: "rgba(255,255,255,0.8)",
+    borderWidth: 3,
+    shadowColor: "#00f0ff",
+    shadowOpacity: 1,
+    shadowRadius: 20,
+    elevation: 15,
+  },
+  selectedCore: {
+    width: "40%",
+    height: "40%",
+    backgroundColor: "#fff",
+    borderRadius: 50,
+  },
+  nodeStart: {
+    borderColor: "#00f0ff",
+    borderWidth: 2,
+    backgroundColor: "rgba(0, 240, 255, 0.1)",
+    borderStyle: "dashed",
+  },
+  startCore: {
+    width: "50%",
+    height: "50%",
+    backgroundColor: "#00f0ff",
+    borderRadius: 50,
+    opacity: 0.8,
+  },
+  nodeStartSelected: {
+    borderColor: "#fff",
+    borderWidth: 3,
+    backgroundColor: "#00f0ff",
+    borderStyle: "solid",
+  },
+  nodeBlocked: {
+    backgroundColor: "#0f0f12",
+    borderColor: "#18181b",
+    borderWidth: 2,
+  },
+  crossContainer: {
+    width: "40%",
+    height: "40%",
+    justifyContent: "center",
+    alignItems: "center",
+    opacity: 0.3,
+  },
+  crossLine: {
+    position: "absolute",
+    width: "100%",
+    height: 3,
+    backgroundColor: "#ff3366",
+    borderRadius: 2,
+  },
+  controls: {
+    flexDirection: "row",
+    gap: 15,
+    paddingHorizontal: 20,
+    width: "100%",
+    justifyContent: "center",
+  },
+  controlBtn: {
+    paddingHorizontal: 35,
+    paddingVertical: 18,
+    backgroundColor: "#00f0ff",
+    borderRadius: 100,
+    minWidth: 140,
+    alignItems: "center",
+    shadowColor: "#00f0ff",
+    shadowOpacity: 0.4,
+    shadowRadius: 10,
+    elevation: 5,
+  },
+  controlText: {
+    color: "#09090b",
+    fontSize: 16,
+    fontWeight: "900",
+    letterSpacing: 2,
+  },
+  controlBtnSecondary: {
+    paddingHorizontal: 35,
+    paddingVertical: 18,
+    backgroundColor: "#18181b",
+    borderRadius: 100,
+    minWidth: 140,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#27272a",
+  },
+  controlTextSecondary: {
+    color: "#a1a1aa",
+    fontSize: 16,
+    fontWeight: "800",
+    letterSpacing: 2,
+  },
 });

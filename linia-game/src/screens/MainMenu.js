@@ -1,152 +1,205 @@
-import React from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, SafeAreaView, StatusBar, Alert } from 'react-native';
+import React, { useEffect, useRef, useState } from "react";
+import {
+  StyleSheet,
+  Text,
+  View,
+  TouchableOpacity,
+  Animated,
+  Easing,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import SettingsModal from "../components/SettingsModal"; // <-- Settings Import
 
 export default function MainMenu({ navigation }) {
+  const colorAnim = useRef(new Animated.Value(0)).current;
+  const widthAnim = useRef(new Animated.Value(0)).current;
+
+  // Settings Modal State
+  const [showSettings, setShowSettings] = useState(false);
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.timing(colorAnim, {
+        toValue: 1,
+        duration: 4000,
+        easing: Easing.linear,
+        useNativeDriver: false,
+      }),
+    ).start();
+
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(widthAnim, {
+          toValue: 1,
+          duration: 1500,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: false,
+        }),
+        Animated.timing(widthAnim, {
+          toValue: 0,
+          duration: 1500,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: false,
+        }),
+      ]),
+    ).start();
+  }, [colorAnim, widthAnim]);
+
+  const animatedColor = colorAnim.interpolate({
+    inputRange: [0, 0.33, 0.66, 1],
+    outputRange: ["#00f0ff", "#ff0055", "#b500ff", "#00f0ff"],
+  });
+
+  const animatedWidth = widthAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [60, 180],
+  });
+
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" />
-      
-      {/* Title & Branding Section */}
-      <View style={styles.titleContainer}>
-        <Text style={styles.title}>LINIA</Text>
-        <Text style={styles.subtitle}>THE HAMILTONIAN PUZZLE</Text>
-        
-        {/* A minimal decorative graphic to represent connected paths */}
-        <View style={styles.decorationContainer}>
-          <View style={[styles.dot, styles.dotActive]} />
-          <View style={styles.line} />
-          <View style={[styles.dot, styles.dotActive]} />
-          <View style={styles.lineInactive} />
-          <View style={styles.dot} />
+      <View style={styles.logoSection}>
+        <View style={styles.titleWrapper}>
+          <Text style={[styles.titleText, styles.titleGlow]}>LINIA</Text>
+          <Text style={styles.titleText}>LINIA</Text>
+          <Animated.View
+            style={[
+              styles.neonBeam,
+              {
+                backgroundColor: animatedColor,
+                shadowColor: animatedColor,
+                width: animatedWidth,
+              },
+            ]}
+          />
+          <Text style={styles.subtitleText}>NEON CIRCUITS</Text>
         </View>
       </View>
 
-      {/* Navigation Buttons Section */}
-      <View style={styles.menuContainer}>
-        <TouchableOpacity 
-          style={styles.primaryButton}
-          onPress={() => navigation.navigate('Gameplay')}
+      <View style={styles.buttonSection}>
+        <TouchableOpacity
+          style={styles.primaryBtn}
           activeOpacity={0.8}
+          onPress={() => navigation.navigate("Gameplay")}
         >
-          <Text style={styles.primaryButtonText}>START GAME</Text>
+          <Text style={styles.primaryBtnText}>START GAME</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity 
-          style={styles.secondaryButton}
-          onPress={() => navigation.navigate('LevelSelection')}
-          activeOpacity={0.7}
+        <TouchableOpacity
+          style={styles.secondaryBtn}
+          activeOpacity={0.6}
+          onPress={() => navigation.navigate("LevelSelection")}
         >
-          <Text style={styles.secondaryButtonText}>SELECT LEVEL</Text>
+          <Text style={styles.secondaryBtnText}>SELECT LEVEL</Text>
+        </TouchableOpacity>
+
+        {/* SETTINGS BUTTON CONNECTED HERE */}
+        <TouchableOpacity
+          style={styles.secondaryBtn}
+          activeOpacity={0.6}
+          onPress={() => setShowSettings(true)}
+        >
+          <Text style={styles.secondaryBtnText}>SETTINGS</Text>
         </TouchableOpacity>
       </View>
-      
-      {/* Footer Section */}
-      <View style={styles.footer}>
-        <Text style={styles.footerText}>Play & Enjoy</Text>
-      </View>
+
+      {/* RENDER SETTINGS MODAL */}
+      <SettingsModal
+        visible={showSettings}
+        onClose={() => setShowSettings(false)}
+      />
     </SafeAreaView>
   );
 }
 
+// ... (Neeche wale styles exactly wahi hain jo pehle the, usme koi change nahi)
 const styles = StyleSheet.create({
-  container: { 
-    flex: 1, 
-    backgroundColor: '#121212', 
-    alignItems: 'center', 
-    justifyContent: 'space-evenly' 
+  container: {
+    flex: 1,
+    backgroundColor: "#09090b",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 50,
   },
-  titleContainer: { 
-    alignItems: 'center', 
-    marginTop: 40 
+  logoSection: {
+    flex: 1.2,
+    justifyContent: "center",
+    alignItems: "center",
+    width: "100%",
   },
-  title: { 
-    color: '#00e5ff', 
-    fontSize: 65, 
-    fontWeight: '900', 
-    letterSpacing: 8, 
-    textShadowColor: '#00e5ff', 
-    textShadowOffset: { width: 0, height: 0 }, 
-    textShadowRadius: 15 
+  titleWrapper: { alignItems: "center", justifyContent: "center" },
+  titleText: {
+    fontSize: 74,
+    fontWeight: "900",
+    letterSpacing: 18,
+    marginLeft: 18,
+    textAlign: "center",
+    color: "#e0ffff",
+    marginBottom: 8,
   },
-  subtitle: { 
-    color: '#888', 
-    fontSize: 14, 
-    letterSpacing: 4, 
-    marginTop: 5, 
-    fontWeight: '600' 
+  titleGlow: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    color: "rgba(0, 240, 255, 0.3)",
+    textShadowColor: "#00f0ff",
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 25,
+    zIndex: -1,
   },
-  decorationContainer: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    marginTop: 40 
+  neonBeam: {
+    height: 4,
+    borderRadius: 2,
+    shadowOpacity: 1,
+    shadowRadius: 15,
+    elevation: 10,
+    marginBottom: 12,
   },
-  dot: { 
-    width: 12, 
-    height: 12, 
-    borderRadius: 6, 
-    backgroundColor: '#333' 
+  subtitleText: {
+    color: "rgba(0, 240, 255, 0.7)",
+    fontSize: 12,
+    fontWeight: "800",
+    letterSpacing: 10,
+    marginLeft: 10,
+    marginTop: 5,
   },
-  dotActive: { 
-    backgroundColor: '#00e5ff', 
-    shadowColor: '#00e5ff', 
-    shadowOpacity: 0.8, 
-    shadowRadius: 8, 
-    elevation: 5 
+  buttonSection: {
+    flex: 1,
+    width: "100%",
+    paddingHorizontal: 40,
+    justifyContent: "center",
+    gap: 15,
   },
-  line: { 
-    width: 40, 
-    height: 3, 
-    backgroundColor: '#00e5ff' 
+  primaryBtn: {
+    width: "100%",
+    backgroundColor: "#00f0ff",
+    paddingVertical: 20,
+    borderRadius: 16,
+    alignItems: "center",
+    shadowColor: "#00f0ff",
+    shadowOpacity: 0.4,
+    shadowRadius: 15,
+    elevation: 10,
+    marginBottom: 5,
   },
-  lineInactive: { 
-    width: 40, 
-    height: 3, 
-    backgroundColor: '#333' 
+  primaryBtnText: {
+    color: "#050505",
+    fontSize: 16,
+    fontWeight: "900",
+    letterSpacing: 3,
   },
-  menuContainer: { 
-    width: '100%', 
-    alignItems: 'center', 
-    gap: 20 
+  secondaryBtn: {
+    width: "100%",
+    backgroundColor: "transparent",
+    paddingVertical: 18,
+    borderRadius: 16,
+    alignItems: "center",
+    borderWidth: 2,
+    borderColor: "#27272a",
   },
-  primaryButton: { 
-    backgroundColor: '#00e5ff', 
-    width: '75%', 
-    paddingVertical: 18, 
-    borderRadius: 30, 
-    alignItems: 'center', 
-    shadowColor: '#00e5ff', 
-    shadowOpacity: 0.5, 
-    shadowRadius: 10, 
-    elevation: 8 
-  },
-  primaryButtonText: { 
-    color: '#121212', 
-    fontSize: 20, 
-    fontWeight: 'bold', 
-    letterSpacing: 2 
-  },
-  secondaryButton: { 
-    backgroundColor: 'transparent', 
-    width: '75%', 
-    paddingVertical: 18, 
-    borderRadius: 30, 
-    alignItems: 'center', 
-    borderWidth: 2, 
-    borderColor: '#333' 
-  },
-  secondaryButtonText: { 
-    color: '#fff', 
-    fontSize: 18, 
-    fontWeight: '600', 
-    letterSpacing: 2 
-  },
-  footer: { 
-    marginBottom: 10 
-  },
-  footerText: { 
-    color: '#444', 
-    fontSize: 12, 
+  secondaryBtnText: {
+    color: "#a1a1aa",
+    fontSize: 15,
+    fontWeight: "800",
     letterSpacing: 2,
-    fontWeight: 'bold'
-  }
+  },
 });

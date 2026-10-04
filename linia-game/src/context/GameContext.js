@@ -6,41 +6,53 @@ export const GameContext = createContext();
 export const GameProvider = ({ children }) => {
   const [highestUnlockedLevel, setHighestUnlockedLevel] = useState(1);
   const [currentPlayingLevel, setCurrentPlayingLevel] = useState(1);
-  const [isLoaded, setIsLoaded] = useState(false); // Naya safety lock
+  const [isLoaded, setIsLoaded] = useState(false);
+
+  // === NAYI GLOBAL SETTINGS ===
+  const [isSoundOn, setIsSoundOn] = useState(true);
+  const [isVibrationOn, setIsVibrationOn] = useState(true);
 
   useEffect(() => {
-    const loadGameProgress = async () => {
+    const loadData = async () => {
       try {
-        const savedLevel = await AsyncStorage.getItem('SAVE_DATA_HIGHEST_LEVEL');
-        if (savedLevel !== null && !isNaN(parseInt(savedLevel))) {
-          const parsedLevel = parseInt(savedLevel);
-          if (parsedLevel > 97) {
-            setHighestUnlockedLevel(parsedLevel);
-            setCurrentPlayingLevel(parsedLevel);
-          }
+        const savedLevel = await AsyncStorage.getItem('highestUnlockedLevel');
+        if (savedLevel !== null) {
+          setHighestUnlockedLevel(parseInt(savedLevel, 10));
+          setCurrentPlayingLevel(parseInt(savedLevel, 10));
         }
-      } catch (error) {
-        console.error("Failed to load progress");
-      } finally {
-        setIsLoaded(true); // Database ready ho gaya
+
+        // Settings Load Karna
+        const savedSound = await AsyncStorage.getItem('isSoundOn');
+        if (savedSound !== null) setIsSoundOn(JSON.parse(savedSound));
+
+        const savedVib = await AsyncStorage.getItem('isVibrationOn');
+        if (savedVib !== null) setIsVibrationOn(JSON.parse(savedVib));
+
+        setIsLoaded(true);
+      } catch (e) {
+        console.error("Failed to load progress.", e);
+        setIsLoaded(true);
       }
     };
-    loadGameProgress();
+    loadData();
   }, []);
 
   useEffect(() => {
     if (isLoaded) {
-      AsyncStorage.setItem('SAVE_DATA_HIGHEST_LEVEL', highestUnlockedLevel.toString());
+      AsyncStorage.setItem('highestUnlockedLevel', highestUnlockedLevel.toString());
+      // Settings Save Karna (takay app restart hone par same rahein)
+      AsyncStorage.setItem('isSoundOn', JSON.stringify(isSoundOn));
+      AsyncStorage.setItem('isVibrationOn', JSON.stringify(isVibrationOn));
     }
-  }, [highestUnlockedLevel, isLoaded]);
+  }, [highestUnlockedLevel, isSoundOn, isVibrationOn, isLoaded]);
 
   return (
-    <GameContext.Provider value={{ 
-      highestUnlockedLevel, 
-      setHighestUnlockedLevel, 
-      currentPlayingLevel, 
-      setCurrentPlayingLevel,
-      isLoaded // Yeh lock aage pass kar diya
+    <GameContext.Provider value={{
+      highestUnlockedLevel, setHighestUnlockedLevel,
+      currentPlayingLevel, setCurrentPlayingLevel,
+      isLoaded,
+      isSoundOn, setIsSoundOn,
+      isVibrationOn, setIsVibrationOn
     }}>
       {children}
     </GameContext.Provider>
