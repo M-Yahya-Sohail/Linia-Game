@@ -85,7 +85,7 @@ export default function LevelSelection({ navigation }) {
           <Text style={styles.iconBtnText}>←</Text>
         </TouchableOpacity>
         <Text style={styles.titleText}>SELECT LEVEL</Text>
-        <View style={{ width: 45 }} /> {/* Balance spacer */}
+        <View style={{ width: 45 }} />
       </View>
 
       {/* MATRIX GRID WRAPPER */}
@@ -109,7 +109,6 @@ export default function LevelSelection({ navigation }) {
                 ]}
               >
                 {isLocked ? (
-                  /* ULTRA-MINIMALIST CYBERPUNK PADLOCK */
                   <View style={styles.lockContainer}>
                     <View style={styles.lockShackle} />
                     <View style={styles.lockBody} />
@@ -270,7 +269,7 @@ const styles = StyleSheet.create({
     textShadowRadius: 8,
   },
 
-  // === GEOMETRIC VECTOR PADLOCK ===
+  // Geometric Vector Padlock
   lockContainer: {
     width: 20,
     height: 20,
