@@ -25,6 +25,7 @@ export default function Gameplay({ navigation }) {
     isVibrationOn,
     playClickSound,
     playWinSound,
+    saveLevelScore,
   } = useContext(GameContext);
 
   const [levelData, setLevelData] = useState([]);
@@ -33,13 +34,18 @@ export default function Gameplay({ navigation }) {
   const [showWinModal, setShowWinModal] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
 
+  // === STAR RATING & UNDO TRACKING ===
+  const [undoCount, setUndoCount] = useState(0);
+  const [earnedStars, setEarnedStars] = useState(3);
+  const undoCountRef = useRef(0);
+
   const levelDataRef = useRef([]);
   const cellSizeRef = useRef(80);
   const pathRef = useRef([]);
   const isWinningRef = useRef(false);
   const totalValidNodesRef = useRef(0);
 
-  // === LIVE REFS (Stale Closure Fix for In-Game Settings Toggle) ===
+  // === LIVE REFS (Stale Closure Fix for Mid-Game Toggles) ===
   const isSoundOnRef = useRef(isSoundOn);
   const isVibrationOnRef = useRef(isVibrationOn);
 
@@ -51,6 +57,7 @@ export default function Gameplay({ navigation }) {
     isVibrationOnRef.current = isVibrationOn;
   }, [isVibrationOn]);
 
+  // Level Setup & State Reset
   useEffect(() => {
     const newGrid = generateLevel(currentPlayingLevel);
     setLevelData(newGrid);
@@ -64,6 +71,11 @@ export default function Gameplay({ navigation }) {
     isWinningRef.current = false;
     setIsLevelCleared(false);
     setShowWinModal(false);
+
+    // Reset Undos & Stars for new level
+    setUndoCount(0);
+    undoCountRef.current = 0;
+    setEarnedStars(3);
   }, [currentPlayingLevel]);
 
   const screenWidth = Dimensions.get("window").width;
@@ -130,10 +142,22 @@ export default function Gameplay({ navigation }) {
 
     const isLastNode = newPath.length === totalValidNodesRef.current;
 
-    // Live ref check se instant sound/vibration toggle kaam karega
     if (isLastNode && !isWinningRef.current) {
       isWinningRef.current = true;
       setIsLevelCleared(true);
+
+      // Star calculation based on Undos
+      let stars = 3;
+      if (undoCountRef.current > 2) {
+        stars = 1;
+      } else if (undoCountRef.current > 0) {
+        stars = 2;
+      }
+
+      setEarnedStars(stars);
+      if (saveLevelScore) {
+        saveLevelScore(currentPlayingLevel, stars);
+      }
 
       if (isSoundOnRef.current && playWinSound) {
         playWinSound();
@@ -169,6 +193,10 @@ export default function Gameplay({ navigation }) {
     pathRef.current = newPath;
     setPath(newPath);
 
+    // Track Undo Count
+    undoCountRef.current += 1;
+    setUndoCount(undoCountRef.current);
+
     if (isSoundOnRef.current && playClickSound) {
       playClickSound();
     }
@@ -187,6 +215,8 @@ export default function Gameplay({ navigation }) {
     setIsPaused(false);
     pathRef.current = [];
     setPath([]);
+    setUndoCount(0);
+    undoCountRef.current = 0;
   };
 
   const handleMainMenuFromPause = () => {
@@ -216,24 +246,30 @@ export default function Gameplay({ navigation }) {
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* HEADER */}
       <View style={styles.header}>
         <TouchableOpacity
           onPress={() => navigation.goBack()}
           style={styles.iconBtn}
+          activeOpacity={0.7}
         >
           <Text style={styles.iconBtnText}>←</Text>
         </TouchableOpacity>
+
         <View style={styles.levelBadge}>
           <Text style={styles.levelText}>LEVEL {currentPlayingLevel}</Text>
         </View>
+
         <TouchableOpacity
           onPress={() => setIsPaused(true)}
           style={styles.iconBtn}
+          activeOpacity={0.7}
         >
           <Text style={styles.iconBtnText}>॥</Text>
         </TouchableOpacity>
       </View>
 
+      {/* PUZZLE GRID */}
       <View style={styles.gridContainer} {...panResponder.panHandlers}>
         {levelData.map((row, rowIndex) => (
           <View key={`row-${rowIndex}`} style={styles.row} pointerEvents="none">
@@ -335,6 +371,7 @@ export default function Gameplay({ navigation }) {
         ))}
       </View>
 
+      {/* CONTROLS */}
       <View style={styles.controls}>
         <TouchableOpacity onPress={handleUndo} style={styles.controlBtn}>
           <Text style={styles.controlText}>UNDO</Text>
@@ -347,6 +384,7 @@ export default function Gameplay({ navigation }) {
         </TouchableOpacity>
       </View>
 
+      {/* PAUSE MENU */}
       <PauseMenu
         isPaused={isPaused}
         setIsPaused={setIsPaused}
@@ -354,9 +392,11 @@ export default function Gameplay({ navigation }) {
         onMainMenu={handleMainMenuFromPause}
       />
 
+      {/* WIN MODAL WITH DYNAMIC STARS */}
       <WinModal
         visible={showWinModal}
         currentLevel={currentPlayingLevel}
+        stars={earnedStars}
         onNextLevel={handleNextLevel}
         onMainMenu={handleMainMenuFromWin}
       />

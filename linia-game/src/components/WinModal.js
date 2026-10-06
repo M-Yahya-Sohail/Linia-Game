@@ -1,68 +1,154 @@
 import React, { useEffect, useRef } from "react";
-import { StyleSheet, Text, View, TouchableOpacity, Modal, Animated, Easing } from "react-native";
+import {
+  StyleSheet,
+  Text,
+  View,
+  TouchableOpacity,
+  Modal,
+  Animated,
+  Easing,
+} from "react-native";
 
-export default function WinModal({ visible, currentLevel, onNextLevel, onMainMenu }) {
-  // Animations ke liye values
-  const scaleAnim = useRef(new Animated.Value(0.8)).current;
+export default function WinModal({
+  visible,
+  currentLevel,
+  stars = 3,
+  onNextLevel,
+  onMainMenu,
+}) {
+  const scaleAnim = useRef(new Animated.Value(0.7)).current;
   const opacityAnim = useRef(new Animated.Value(0)).current;
+
+  // Star animations
+  const star1Anim = useRef(new Animated.Value(0)).current;
+  const star2Anim = useRef(new Animated.Value(0)).current;
+  const star3Anim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     if (visible) {
-      // Jab modal open ho toh dono animations ek sath chalao
+      star1Anim.setValue(0);
+      star2Anim.setValue(0);
+      star3Anim.setValue(0);
+
       Animated.parallel([
         Animated.timing(scaleAnim, {
           toValue: 1,
-          duration: 400,
-          easing: Easing.out(Easing.back(1.5)), // Halka sa bounce effect
+          duration: 350,
+          easing: Easing.out(Easing.back(1.4)),
           useNativeDriver: true,
         }),
         Animated.timing(opacityAnim, {
           toValue: 1,
-          duration: 300,
+          duration: 250,
           useNativeDriver: true,
         }),
       ]).start();
+
+      // Sequential star pop animations
+      const starAnimations = [];
+      if (stars >= 1) {
+        starAnimations.push(
+          Animated.spring(star1Anim, {
+            toValue: 1,
+            friction: 4,
+            useNativeDriver: true,
+          })
+        );
+      }
+      if (stars >= 2) {
+        starAnimations.push(
+          Animated.spring(star2Anim, {
+            toValue: 1,
+            friction: 4,
+            useNativeDriver: true,
+          })
+        );
+      }
+      if (stars >= 3) {
+        starAnimations.push(
+          Animated.spring(star3Anim, {
+            toValue: 1,
+            friction: 4,
+            useNativeDriver: true,
+          })
+        );
+      }
+
+      Animated.stagger(140, starAnimations).start();
     } else {
-      // Modal close hone par values reset karo
-      scaleAnim.setValue(0.8);
+      scaleAnim.setValue(0.7);
       opacityAnim.setValue(0);
     }
-  }, [visible]);
+  }, [visible, stars]);
+
+  const starScales = [star1Anim, star2Anim, star3Anim];
 
   return (
     <Modal
       transparent={true}
       visible={visible}
-      animationType="none" // Hum custom animation use kar rahe hain
-      onRequestClose={() => {}}
+      animationType="none"
+      onRequestClose={onMainMenu}
     >
       <View style={styles.overlay}>
-        <Animated.View style={[styles.modalCard, { opacity: opacityAnim, transform: [{ scale: scaleAnim }] }]}>
-          
-          {/* Minimalist Glowing Level Ring */}
-          <View style={styles.ringContainer}>
-            <View style={styles.glowRing} />
-            <Text style={styles.ringText}>{currentLevel}</Text>
+        <Animated.View
+          style={[
+            styles.card,
+            { opacity: opacityAnim, transform: [{ scale: scaleAnim }] },
+          ]}
+        >
+          {/* Level Badge */}
+          <View style={styles.levelBadge}>
+            <Text style={styles.levelNumber}>{currentLevel}</Text>
           </View>
 
-          <Text style={styles.titleText}>LEVEL CLEARED</Text>
-          
-          {/* Elegant Divider */}
-          <View style={styles.divider} />
-          
-          <Text style={styles.subtitleText}>Circuit connected successfully.</Text>
-          
-          {/* Sleek Buttons */}
-          <View style={styles.buttonWrapper}>
-            <TouchableOpacity onPress={onNextLevel} style={styles.primaryBtn} activeOpacity={0.8}>
-              <Text style={styles.primaryBtnText}>NEXT LEVEL</Text>
-            </TouchableOpacity>
+          <Text style={styles.title}>LEVEL CLEARED</Text>
+          <Text style={styles.subtitle}>Circuit connected successfully.</Text>
 
-            <TouchableOpacity onPress={onMainMenu} style={styles.secondaryBtn} activeOpacity={0.6}>
-              <Text style={styles.secondaryBtnText}>MAIN MENU</Text>
-            </TouchableOpacity>
+          {/* Glowing 3-Stars Container */}
+          <View style={styles.starsRow}>
+            {[1, 2, 3].map((index) => {
+              const isEarned = index <= stars;
+              const animVal = starScales[index - 1];
+
+              return (
+                <View key={index} style={styles.starWrapper}>
+                  {/* Empty base star */}
+                  <Text style={styles.emptyStar}>★</Text>
+                  {/* Earned neon star overlay */}
+                  {isEarned && (
+                    <Animated.Text
+                      style={[
+                        styles.filledStar,
+                        {
+                          transform: [{ scale: animVal }],
+                        },
+                      ]}
+                    >
+                      ★
+                    </Animated.Text>
+                  )}
+                </View>
+              );
+            })}
           </View>
 
+          {/* Action Buttons */}
+          <TouchableOpacity
+            style={styles.nextBtn}
+            activeOpacity={0.8}
+            onPress={onNextLevel}
+          >
+            <Text style={styles.nextBtnText}>NEXT LEVEL</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.menuBtn}
+            activeOpacity={0.7}
+            onPress={onMainMenu}
+          >
+            <Text style={styles.menuBtnText}>MAIN MENU</Text>
+          </TouchableOpacity>
         </Animated.View>
       </View>
     </Modal>
@@ -70,112 +156,112 @@ export default function WinModal({ visible, currentLevel, onNextLevel, onMainMen
 }
 
 const styles = StyleSheet.create({
-  // Pitch dark overlay to put complete focus on the modal
   overlay: {
     flex: 1,
-    backgroundColor: "rgba(5, 5, 8, 0.95)", 
+    backgroundColor: "rgba(5, 5, 8, 0.92)",
     justifyContent: "center",
     alignItems: "center",
   },
-  
-  // Sleek, borderless dark card
-  modalCard: {
+  card: {
     width: "85%",
     backgroundColor: "#0d0d12",
-    paddingVertical: 45,
-    paddingHorizontal: 30,
-    borderRadius: 35,
+    borderRadius: 28,
+    paddingVertical: 35,
+    paddingHorizontal: 25,
     alignItems: "center",
-    borderWidth: 1,
-    borderColor: "rgba(0, 240, 255, 0.15)", // Very subtle border
+    borderWidth: 1.5,
+    borderColor: "rgba(0, 240, 255, 0.25)",
     shadowColor: "#00f0ff",
-    shadowOpacity: 0.15,
-    shadowRadius: 40,
+    shadowOpacity: 0.2,
+    shadowRadius: 30,
     elevation: 20,
   },
-
-  // Premium Geometric Level Ring
-  ringContainer: {
-    width: 90,
-    height: 90,
+  levelBadge: {
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    backgroundColor: "#121216",
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 30,
-  },
-  glowRing: {
-    position: "absolute",
-    width: "100%",
-    height: "100%",
-    borderRadius: 45,
     borderWidth: 2,
     borderColor: "#00f0ff",
+    marginBottom: 16,
     shadowColor: "#00f0ff",
-    shadowOpacity: 0.8,
-    shadowRadius: 15,
-    elevation: 10,
+    shadowOpacity: 0.6,
+    shadowRadius: 12,
   },
-  ringText: {
-    color: "#fff",
-    fontSize: 32,
+  levelNumber: {
+    color: "#ffffff",
+    fontSize: 24,
     fontWeight: "900",
+  },
+  title: {
+    color: "#ffffff",
+    fontSize: 20,
+    fontWeight: "900",
+    letterSpacing: 3,
+    marginBottom: 6,
+  },
+  subtitle: {
+    color: "#71717a",
+    fontSize: 13,
+    fontWeight: "600",
     letterSpacing: 1,
+    marginBottom: 20,
   },
-
-  // Elegant Typography
-  titleText: {
-    color: "#fff",
-    fontSize: 22,
-    fontWeight: "800",
-    letterSpacing: 6,
-    marginBottom: 15,
+  starsRow: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 15,
+    marginBottom: 28,
   },
-  divider: {
-    width: 40,
-    height: 3,
-    backgroundColor: "#00f0ff",
-    borderRadius: 5,
-    marginBottom: 15,
-    shadowColor: "#00f0ff",
-    shadowOpacity: 1,
-    shadowRadius: 5,
-  },
-  subtitleText: {
-    color: "#888",
-    fontSize: 14,
-    fontWeight: "500",
-    letterSpacing: 1.5,
-    marginBottom: 40,
-    textAlign: "center",
-  },
-
-  // Refined Minimalist Buttons
-  buttonWrapper: {
-    width: "100%",
-    gap: 12,
-  },
-  primaryBtn: {
-    width: "100%",
-    paddingVertical: 18,
-    backgroundColor: "#00f0ff",
-    borderRadius: 16, // Modern slightly rounded corners instead of full pills
+  starWrapper: {
+    width: 44,
+    height: 44,
+    justifyContent: "center",
     alignItems: "center",
   },
-  primaryBtnText: {
-    color: "#050505",
+  emptyStar: {
+    position: "absolute",
+    fontSize: 40,
+    color: "#27272a",
+  },
+  filledStar: {
+    position: "absolute",
+    fontSize: 40,
+    color: "#ffb703",
+    textShadowColor: "#fb8500",
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 15,
+  },
+  nextBtn: {
+    width: "100%",
+    backgroundColor: "#00f0ff",
+    paddingVertical: 16,
+    borderRadius: 14,
+    alignItems: "center",
+    marginBottom: 12,
+    shadowColor: "#00f0ff",
+    shadowOpacity: 0.4,
+    shadowRadius: 10,
+    elevation: 6,
+  },
+  nextBtnText: {
+    color: "#050508",
     fontSize: 15,
     fontWeight: "900",
     letterSpacing: 2,
   },
-  secondaryBtn: {
+  menuBtn: {
     width: "100%",
-    paddingVertical: 18,
-    backgroundColor: "transparent",
-    borderRadius: 16,
+    paddingVertical: 14,
+    borderRadius: 14,
     alignItems: "center",
   },
-  secondaryBtnText: {
-    color: "#666",
-    fontSize: 14,
+  menuBtnText: {
+    color: "#71717a",
+    fontSize: 13,
     fontWeight: "800",
     letterSpacing: 2,
   },

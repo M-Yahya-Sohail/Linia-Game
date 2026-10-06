@@ -17,6 +17,7 @@ export default function LevelSelection({ navigation }) {
     highestUnlockedLevel,
     currentPlayingLevel,
     setCurrentPlayingLevel,
+    levelStars = {},
     isLoaded,
   } = useContext(GameContext);
 
@@ -95,6 +96,7 @@ export default function LevelSelection({ navigation }) {
             const isUnlocked = level <= highestUnlockedLevel;
             const isCurrent = level === currentPlayingLevel;
             const isLocked = level > highestUnlockedLevel;
+            const earnedStars = levelStars[level] || 0;
 
             return (
               <TouchableOpacity
@@ -114,14 +116,31 @@ export default function LevelSelection({ navigation }) {
                     <View style={styles.lockBody} />
                   </View>
                 ) : (
-                  <Text
-                    style={[
-                      styles.levelNumber,
-                      isCurrent && styles.textCurrent,
-                    ]}
-                  >
-                    {level}
-                  </Text>
+                  <>
+                    <Text
+                      style={[
+                        styles.levelNumber,
+                        isCurrent && styles.textCurrent,
+                      ]}
+                    >
+                      {level}
+                    </Text>
+
+                    {/* MINI 3-STAR RATING */}
+                    <View style={styles.miniStarsRow}>
+                      {[1, 2, 3].map((s) => (
+                        <Text
+                          key={s}
+                          style={[
+                            styles.miniStar,
+                            s <= earnedStars && styles.miniStarActive,
+                          ]}
+                        >
+                          ★
+                        </Text>
+                      ))}
+                    </View>
+                  </>
                 )}
               </TouchableOpacity>
             );
@@ -235,12 +254,13 @@ const styles = StyleSheet.create({
 
   // Premium Cyberpunk Grid Nodes
   levelBox: {
-    width: 56,
-    height: 56,
+    width: 58,
+    height: 60,
     justifyContent: "center",
     alignItems: "center",
     borderRadius: 16,
     borderWidth: 1.5,
+    paddingVertical: 4,
   },
 
   boxUnlocked: { backgroundColor: "#121214", borderColor: "#27272a" },
@@ -255,18 +275,35 @@ const styles = StyleSheet.create({
   boxLocked: { backgroundColor: "#0c0c0e", borderColor: "#18181b" },
 
   levelNumber: {
-    color: "#71717a",
-    fontSize: 18,
+    color: "#a1a1aa",
+    fontSize: 17,
     fontWeight: "800",
     letterSpacing: 0.5,
   },
   textCurrent: {
     color: "#ffffff",
-    fontSize: 22,
+    fontSize: 18,
     fontWeight: "900",
     textShadowColor: "#00f0ff",
     textShadowOffset: { width: 0, height: 0 },
     textShadowRadius: 8,
+  },
+
+  // Mini Stars inside level cell
+  miniStarsRow: {
+    flexDirection: "row",
+    gap: 2,
+    marginTop: 2,
+  },
+  miniStar: {
+    fontSize: 9,
+    color: "#27272a",
+  },
+  miniStarActive: {
+    color: "#ffb703",
+    textShadowColor: "rgba(251, 133, 0, 0.8)",
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 4,
   },
 
   // Geometric Vector Padlock

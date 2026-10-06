@@ -1,6 +1,6 @@
-import React, { createContext, useState, useEffect, useRef } from "react";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { createAudioPlayer, setAudioModeAsync } from "expo-audio";
+import React, { createContext, useState, useEffect, useRef } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { createAudioPlayer, setAudioModeAsync } from 'expo-audio';
 
 export const GameContext = createContext();
 
@@ -13,11 +13,14 @@ export const GameProvider = ({ children }) => {
   const [isSoundOn, setIsSoundOn] = useState(true);
   const [isVibrationOn, setIsVibrationOn] = useState(true);
 
+  // === NEW: STARS TRACKING ({ 1: 3, 2: 2, 3: 1 }) ===
+  const [levelStars, setLevelStars] = useState({});
+
   // Sound Players Reference
   const clickPlayerRef = useRef(null);
   const winPlayerRef = useRef(null);
 
-  // 1. Audio Engine & Players Setup (iOS Silent Mode bypass included)
+  // 1. Audio Engine & Players Setup
   useEffect(() => {
     async function initAudio() {
       try {
@@ -25,27 +28,21 @@ export const GameProvider = ({ children }) => {
           playsInSilentModeIOS: true,
         });
 
-        clickPlayerRef.current = createAudioPlayer(
-          require("../../assets/sounds/click.mp3"),
-        );
-        winPlayerRef.current = createAudioPlayer(
-          require("../../assets/sounds/win.mp3"),
-        );
+        clickPlayerRef.current = createAudioPlayer(require('../../assets/sounds/click.mp3'));
+        winPlayerRef.current = createAudioPlayer(require('../../assets/sounds/win.mp3'));
       } catch (err) {
-        console.warn("Audio setup error:", err);
+        console.warn('Audio setup error:', err);
       }
     }
     initAudio();
 
     return () => {
-      // Clean up players on unmount
       if (clickPlayerRef.current) clickPlayerRef.current.remove();
       if (winPlayerRef.current) winPlayerRef.current.remove();
     };
   }, []);
 
   // 2. Play Sound Functions
-  // GameContext.js ke andar sound play functions:
   const playClickSound = async () => {
     if (!isSoundOn) return;
     try {
@@ -53,26 +50,21 @@ export const GameProvider = ({ children }) => {
         clickPlayerRef.current.seekTo(0);
         clickPlayerRef.current.play();
       }
-    } catch (e) {
-      // ignore rapid click errors
-    }
+    } catch (e) {}
   };
 
   const playWinSound = async () => {
     if (!isSoundOn) return;
     try {
-      // Click sound ko pause karein agar woh chal rahi ho
       if (clickPlayerRef.current) {
-        try {
-          clickPlayerRef.current.pause();
-        } catch (err) {}
+        try { clickPlayerRef.current.pause(); } catch (err) {}
       }
       if (winPlayerRef.current) {
         winPlayerRef.current.seekTo(0);
         winPlayerRef.current.play();
       }
     } catch (e) {
-      console.warn("Win sound error:", e);
+      console.warn('Win sound error:', e);
     }
   };
 
@@ -80,17 +72,21 @@ export const GameProvider = ({ children }) => {
   useEffect(() => {
     const loadData = async () => {
       try {
-        const savedLevel = await AsyncStorage.getItem("highestUnlockedLevel");
+        const savedLevel = await AsyncStorage.getItem('highestUnlockedLevel');
         if (savedLevel !== null) {
           setHighestUnlockedLevel(parseInt(savedLevel, 10));
           setCurrentPlayingLevel(parseInt(savedLevel, 10));
         }
 
-        const savedSound = await AsyncStorage.getItem("isSoundOn");
+        const savedSound = await AsyncStorage.getItem('isSoundOn');
         if (savedSound !== null) setIsSoundOn(JSON.parse(savedSound));
 
-        const savedVib = await AsyncStorage.getItem("isVibrationOn");
+        const savedVib = await AsyncStorage.getItem('isVibrationOn');
         if (savedVib !== null) setIsVibrationOn(JSON.parse(savedVib));
+
+        // Load Saved Stars
+        const savedStars = await AsyncStorage.getItem('levelStars');
+        if (savedStars !== null) setLevelStars(JSON.parse(savedStars));
 
         setIsLoaded(true);
       } catch (e) {
@@ -101,15 +97,25 @@ export const GameProvider = ({ children }) => {
     loadData();
   }, []);
 
-  // 4. Save Storage Data
+  // 4. Save Stars Function (Better score overwrite only)
+  const saveLevelScore = async (level, stars) => {
+    setLevelStars((prev) => {
+      const currentBest = prev[level] || 0;
+      if (stars > currentBest) {
+        const updated = { ...prev, [level]: stars };
+        AsyncStorage.setItem('levelStars', JSON.stringify(updated));
+        return updated;
+      }
+      return prev;
+    });
+  };
+
+  // 5. Save General Storage Data
   useEffect(() => {
     if (isLoaded) {
-      AsyncStorage.setItem(
-        "highestUnlockedLevel",
-        highestUnlockedLevel.toString(),
-      );
-      AsyncStorage.setItem("isSoundOn", JSON.stringify(isSoundOn));
-      AsyncStorage.setItem("isVibrationOn", JSON.stringify(isVibrationOn));
+      AsyncStorage.setItem('highestUnlockedLevel', highestUnlockedLevel.toString());
+      AsyncStorage.setItem('isSoundOn', JSON.stringify(isSoundOn));
+      AsyncStorage.setItem('isVibrationOn', JSON.stringify(isVibrationOn));
     }
   }, [highestUnlockedLevel, isSoundOn, isVibrationOn, isLoaded]);
 
@@ -127,6 +133,8 @@ export const GameProvider = ({ children }) => {
         setIsVibrationOn,
         playClickSound,
         playWinSound,
+        levelStars,
+        saveLevelScore,
       }}
     >
       {children}
