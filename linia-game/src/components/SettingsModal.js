@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useContext } from "react";
+import React, { useEffect, useRef, useContext, useState } from "react";
 import {
   StyleSheet,
   Text,
@@ -8,7 +8,8 @@ import {
   Animated,
   Easing,
 } from "react-native";
-import { GameContext } from "../context/GameContext"; // Context Import Kiya
+import { GameContext } from "../context/GameContext";
+import PolicyModal from "./PolicyModal";
 
 // Custom Cyberpunk Toggle Switch
 const NeonToggle = ({ label, value, onToggle }) => {
@@ -35,7 +36,10 @@ export default function SettingsModal({ visible, onClose }) {
   const scaleAnim = useRef(new Animated.Value(0.8)).current;
   const opacityAnim = useRef(new Animated.Value(0)).current;
 
-  // GLOBAL STATE USE KI (Ab Main Menu aur Gameplay dono perfectly sync rahenge)
+  // Policy Modal state
+  const [showPolicy, setShowPolicy] = useState(false);
+
+  // GLOBAL STATE
   const { isSoundOn, setIsSoundOn, isVibrationOn, setIsVibrationOn } =
     useContext(GameContext);
 
@@ -88,6 +92,16 @@ export default function SettingsModal({ visible, onClose }) {
               value={isVibrationOn}
               onToggle={() => setIsVibrationOn(!isVibrationOn)}
             />
+
+            {/* TERMS & PRIVACY BUTTON */}
+            <TouchableOpacity
+              activeOpacity={0.7}
+              style={styles.policyRow}
+              onPress={() => setShowPolicy(true)}
+            >
+              <Text style={styles.policyLabel}>TERMS & PRIVACY</Text>
+              <Text style={styles.policyArrow}>→</Text>
+            </TouchableOpacity>
           </View>
 
           <TouchableOpacity
@@ -99,12 +113,18 @@ export default function SettingsModal({ visible, onClose }) {
           </TouchableOpacity>
         </Animated.View>
       </View>
+
+      {/* POLICY MODAL COMPONENT */}
+      <PolicyModal
+        visible={showPolicy}
+        onClose={() => setShowPolicy(false)}
+      />
     </Modal>
   );
 }
 
 // ==========================================
-// STYLESHEET (No Changes Here)
+// STYLESHEET
 // ==========================================
 const styles = StyleSheet.create({
   overlay: {
@@ -116,7 +136,7 @@ const styles = StyleSheet.create({
   modalCard: {
     width: "85%",
     backgroundColor: "#0d0d12",
-    paddingVertical: 40,
+    paddingVertical: 35,
     paddingHorizontal: 30,
     borderRadius: 28,
     alignItems: "center",
@@ -142,12 +162,12 @@ const styles = StyleSheet.create({
     height: 3,
     backgroundColor: "#00f0ff",
     borderRadius: 5,
-    marginBottom: 35,
+    marginBottom: 30,
     shadowColor: "#00f0ff",
     shadowOpacity: 1,
     shadowRadius: 5,
   },
-  settingsContainer: { width: "100%", gap: 25, marginBottom: 40 },
+  settingsContainer: { width: "100%", gap: 20, marginBottom: 35 },
   toggleRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -186,6 +206,30 @@ const styles = StyleSheet.create({
     shadowColor: "#fff",
     shadowOpacity: 0.8,
     shadowRadius: 5,
+  },
+  policyRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    width: "100%",
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    backgroundColor: "#18181b",
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#27272a",
+    marginTop: 5,
+  },
+  policyLabel: {
+    color: "#a1a1aa",
+    fontSize: 12,
+    fontWeight: "800",
+    letterSpacing: 2,
+  },
+  policyArrow: {
+    color: "#00f0ff",
+    fontSize: 16,
+    fontWeight: "900",
   },
   closeBtn: {
     width: "100%",

@@ -22,9 +22,7 @@ export default function Gameplay({ navigation }) {
     currentPlayingLevel,
     setCurrentPlayingLevel,
     isSoundOn,
-    setIsSoundOn,
     isVibrationOn,
-    setIsVibrationOn,
     playClickSound,
     playWinSound,
   } = useContext(GameContext);
@@ -40,6 +38,18 @@ export default function Gameplay({ navigation }) {
   const pathRef = useRef([]);
   const isWinningRef = useRef(false);
   const totalValidNodesRef = useRef(0);
+
+  // === LIVE REFS (Stale Closure Fix for In-Game Settings Toggle) ===
+  const isSoundOnRef = useRef(isSoundOn);
+  const isVibrationOnRef = useRef(isVibrationOn);
+
+  useEffect(() => {
+    isSoundOnRef.current = isSoundOn;
+  }, [isSoundOn]);
+
+  useEffect(() => {
+    isVibrationOnRef.current = isVibrationOn;
+  }, [isVibrationOn]);
 
   useEffect(() => {
     const newGrid = generateLevel(currentPlayingLevel);
@@ -120,25 +130,25 @@ export default function Gameplay({ navigation }) {
 
     const isLastNode = newPath.length === totalValidNodesRef.current;
 
-    // Check Win Condition First: Click sound ko win sound ke sath clash hone se bachana
+    // Live ref check se instant sound/vibration toggle kaam karega
     if (isLastNode && !isWinningRef.current) {
       isWinningRef.current = true;
       setIsLevelCleared(true);
 
-      if (playWinSound) {
+      if (isSoundOnRef.current && playWinSound) {
         playWinSound();
       }
 
-      if (isVibrationOn && Platform.OS !== "web") {
-        Vibration.vibrate([0, 100, 50, 100]); // Long reward vibration
+      if (isVibrationOnRef.current && Platform.OS !== "web") {
+        Vibration.vibrate([0, 100, 50, 100]);
       }
     } else if (!isWinningRef.current) {
-      if (playClickSound) {
+      if (isSoundOnRef.current && playClickSound) {
         playClickSound();
       }
 
-      if (isVibrationOn && Platform.OS !== "web") {
-        Vibration.vibrate(35); // Small haptic tick
+      if (isVibrationOnRef.current && Platform.OS !== "web") {
+        Vibration.vibrate(35);
       }
     }
   };
@@ -159,8 +169,10 @@ export default function Gameplay({ navigation }) {
     pathRef.current = newPath;
     setPath(newPath);
 
-    if (playClickSound) playClickSound();
-    if (isVibrationOn && Platform.OS !== "web") {
+    if (isSoundOnRef.current && playClickSound) {
+      playClickSound();
+    }
+    if (isVibrationOnRef.current && Platform.OS !== "web") {
       Vibration.vibrate(20);
     }
   };
@@ -338,10 +350,6 @@ export default function Gameplay({ navigation }) {
       <PauseMenu
         isPaused={isPaused}
         setIsPaused={setIsPaused}
-        isSoundOn={isSoundOn}
-        setIsSoundOn={setIsSoundOn}
-        isVibrationOn={isVibrationOn}
-        setIsVibrationOn={setIsVibrationOn}
         onRestart={handleRestartFromPause}
         onMainMenu={handleMainMenuFromPause}
       />
