@@ -19,7 +19,7 @@ export default function App() {
           <Stack.Navigator screenOptions={{ headerShown: false }}>
             <Stack.Screen name="MainMenu" component={MainMenu} />
             <Stack.Screen name="LevelSelection" component={LevelSelection} />
-            <Stack.Screen name="Gameplay" component={Gameplay} />
+            <Stack.Screen name="Gameplay" component={Gameplay} options={{ gestureEnabled: false }}/>
           </Stack.Navigator>
           <StatusBar style="light" />
         </NavigationContainer>

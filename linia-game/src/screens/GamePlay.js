@@ -60,7 +60,7 @@ export default function Gameplay({ navigation }) {
   const columns = levelData.length > 0 ? levelData[0].length : 3;
   const currentCellSize = Math.min(
     85,
-    Math.floor((screenWidth - 40) / columns),
+    Math.floor((screenWidth - 40) / columns)
   );
   cellSizeRef.current = currentCellSize;
   const NODE_SIZE = currentCellSize * 0.45;
@@ -74,7 +74,7 @@ export default function Gameplay({ navigation }) {
         handleTouch(evt.nativeEvent.locationX, evt.nativeEvent.locationY),
       onPanResponderMove: (evt) =>
         handleTouch(evt.nativeEvent.locationX, evt.nativeEvent.locationY),
-    }),
+    })
   ).current;
 
   const handleTouch = (x, y) => {
@@ -118,20 +118,25 @@ export default function Gameplay({ navigation }) {
     pathRef.current = newPath;
     setPath([...newPath]);
 
-    // Check Win Condition First
-    if (
-      newPath.length === totalValidNodesRef.current &&
-      !isWinningRef.current
-    ) {
+    const isLastNode = newPath.length === totalValidNodesRef.current;
+
+    // Check Win Condition First: Click sound ko win sound ke sath clash hone se bachana
+    if (isLastNode && !isWinningRef.current) {
       isWinningRef.current = true;
       setIsLevelCleared(true);
 
-      if (playWinSound) playWinSound();
+      if (playWinSound) {
+        playWinSound();
+      }
+
       if (isVibrationOn && Platform.OS !== "web") {
         Vibration.vibrate([0, 100, 50, 100]); // Long reward vibration
       }
-    } else {
-      if (playClickSound) playClickSound();
+    } else if (!isWinningRef.current) {
+      if (playClickSound) {
+        playClickSound();
+      }
+
       if (isVibrationOn && Platform.OS !== "web") {
         Vibration.vibrate(35); // Small haptic tick
       }

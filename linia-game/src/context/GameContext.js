@@ -1,6 +1,6 @@
-import React, { createContext, useState, useEffect, useRef } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { createAudioPlayer, setAudioModeAsync } from 'expo-audio';
+import React, { createContext, useState, useEffect, useRef } from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { createAudioPlayer, setAudioModeAsync } from "expo-audio";
 
 export const GameContext = createContext();
 
@@ -25,10 +25,14 @@ export const GameProvider = ({ children }) => {
           playsInSilentModeIOS: true,
         });
 
-        clickPlayerRef.current = createAudioPlayer(require('../../assets/sounds/click.mp3'));
-        winPlayerRef.current = createAudioPlayer(require('../../assets/sounds/win.mp3'));
+        clickPlayerRef.current = createAudioPlayer(
+          require("../../assets/sounds/click.mp3"),
+        );
+        winPlayerRef.current = createAudioPlayer(
+          require("../../assets/sounds/win.mp3"),
+        );
       } catch (err) {
-        console.warn('Audio setup error:', err);
+        console.warn("Audio setup error:", err);
       }
     }
     initAudio();
@@ -41,33 +45,34 @@ export const GameProvider = ({ children }) => {
   }, []);
 
   // 2. Play Sound Functions
+  // GameContext.js ke andar sound play functions:
   const playClickSound = async () => {
     if (!isSoundOn) return;
     try {
       if (clickPlayerRef.current) {
         clickPlayerRef.current.seekTo(0);
         clickPlayerRef.current.play();
-      } else {
-        const player = createAudioPlayer(require('../../assets/sounds/click.mp3'));
-        player.play();
       }
     } catch (e) {
-      console.warn('Click sound error:', e);
+      // ignore rapid click errors
     }
   };
 
   const playWinSound = async () => {
     if (!isSoundOn) return;
     try {
+      // Click sound ko pause karein agar woh chal rahi ho
+      if (clickPlayerRef.current) {
+        try {
+          clickPlayerRef.current.pause();
+        } catch (err) {}
+      }
       if (winPlayerRef.current) {
         winPlayerRef.current.seekTo(0);
         winPlayerRef.current.play();
-      } else {
-        const player = createAudioPlayer(require('../../assets/sounds/win.mp3'));
-        player.play();
       }
     } catch (e) {
-      console.warn('Win sound error:', e);
+      console.warn("Win sound error:", e);
     }
   };
 
@@ -75,16 +80,16 @@ export const GameProvider = ({ children }) => {
   useEffect(() => {
     const loadData = async () => {
       try {
-        const savedLevel = await AsyncStorage.getItem('highestUnlockedLevel');
+        const savedLevel = await AsyncStorage.getItem("highestUnlockedLevel");
         if (savedLevel !== null) {
           setHighestUnlockedLevel(parseInt(savedLevel, 10));
           setCurrentPlayingLevel(parseInt(savedLevel, 10));
         }
 
-        const savedSound = await AsyncStorage.getItem('isSoundOn');
+        const savedSound = await AsyncStorage.getItem("isSoundOn");
         if (savedSound !== null) setIsSoundOn(JSON.parse(savedSound));
 
-        const savedVib = await AsyncStorage.getItem('isVibrationOn');
+        const savedVib = await AsyncStorage.getItem("isVibrationOn");
         if (savedVib !== null) setIsVibrationOn(JSON.parse(savedVib));
 
         setIsLoaded(true);
@@ -99,9 +104,12 @@ export const GameProvider = ({ children }) => {
   // 4. Save Storage Data
   useEffect(() => {
     if (isLoaded) {
-      AsyncStorage.setItem('highestUnlockedLevel', highestUnlockedLevel.toString());
-      AsyncStorage.setItem('isSoundOn', JSON.stringify(isSoundOn));
-      AsyncStorage.setItem('isVibrationOn', JSON.stringify(isVibrationOn));
+      AsyncStorage.setItem(
+        "highestUnlockedLevel",
+        highestUnlockedLevel.toString(),
+      );
+      AsyncStorage.setItem("isSoundOn", JSON.stringify(isSoundOn));
+      AsyncStorage.setItem("isVibrationOn", JSON.stringify(isVibrationOn));
     }
   }, [highestUnlockedLevel, isSoundOn, isVibrationOn, isLoaded]);
 
