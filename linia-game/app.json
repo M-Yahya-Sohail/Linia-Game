@@ -7,7 +7,6 @@
     "icon": "./assets/images/icon.png",
     "scheme": "liniagame",
     "userInterfaceStyle": "dark",
-    "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.linia.game"
@@ -18,7 +17,6 @@
         "foregroundImage": "./assets/images/android-icon-foreground.png"
       },
       "package": "com.linia.game",
-      "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
     },
     "web": {
@@ -42,7 +40,8 @@
       "expo-image",
       "expo-status-bar",
       "expo-web-browser",
-      "expo-audio"
+      "expo-audio",
+      "expo-asset"
     ],
     "experiments": {
       "reactCompiler": true
