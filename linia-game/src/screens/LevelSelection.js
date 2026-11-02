@@ -1,6 +1,3 @@
-// ==========================================
-// 1. IMPORTS & CONTEXT
-// ==========================================
 import React, { useState, useEffect, useContext } from "react";
 import {
   StyleSheet,
@@ -8,7 +5,10 @@ import {
   View,
   TouchableOpacity,
   ActivityIndicator,
+  ScrollView,
+  useWindowDimensions,
 } from "react-native";
+
 import { SafeAreaView } from "react-native-safe-area-context";
 import { GameContext } from "../context/GameContext";
 
@@ -21,13 +21,24 @@ export default function LevelSelection({ navigation }) {
     isLoaded,
   } = useContext(GameContext);
 
-  // ==========================================
-  // 2. CONFIGURATION & STATE
-  // ==========================================
+  const { width } = useWindowDimensions();
+
+  const GRID_COLUMNS = 5;
+  const GRID_GAP = 10;
+
+  const gridWidth = Math.max(0, Math.min(width - 32, 350));
+
+  const cellSize = Math.max(
+    0,
+    (gridWidth - GRID_GAP * (GRID_COLUMNS - 1)) / GRID_COLUMNS,
+  );
+
   const levelsPerPage = 25;
+
   const initialPage = Math.floor(
     (currentPlayingLevel > 0 ? currentPlayingLevel - 1 : 0) / levelsPerPage,
   );
+
   const [currentPage, setCurrentPage] = useState(initialPage);
 
   useEffect(() => {
@@ -39,14 +50,12 @@ export default function LevelSelection({ navigation }) {
   );
 
   const startLevel = currentPage * levelsPerPage + 1;
+
   const levels = Array.from(
     { length: levelsPerPage },
     (_, i) => startLevel + i,
   );
 
-  // ==========================================
-  // 3. HANDLERS
-  // ==========================================
   const handleNextPage = () => {
     if (currentPage < maxUnlockedPage) {
       setCurrentPage((prev) => prev + 1);
@@ -85,26 +94,56 @@ export default function LevelSelection({ navigation }) {
         >
           <Text style={styles.iconBtnText}>←</Text>
         </TouchableOpacity>
-        <Text style={styles.titleText}>SELECT LEVEL</Text>
+
+        <Text
+          style={styles.titleText}
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.7}
+        >
+          SELECT LEVEL
+        </Text>
+
         <View style={{ width: 45 }} />
       </View>
 
-      {/* MATRIX GRID WRAPPER */}
-      <View style={styles.gridWrapper}>
-        <View style={styles.grid}>
+      {/* RESPONSIVE LEVEL GRID */}
+      <ScrollView
+        style={styles.gridScroll}
+        contentContainerStyle={styles.gridWrapper}
+        showsVerticalScrollIndicator={false}
+      >
+        <View
+          style={[
+            styles.grid,
+            {
+              width: gridWidth,
+              columnGap: GRID_GAP,
+              rowGap: GRID_GAP,
+            },
+          ]}
+        >
           {levels.map((level) => {
             const isUnlocked = level <= highestUnlockedLevel;
+
             const isCurrent = level === currentPlayingLevel;
+
             const isLocked = level > highestUnlockedLevel;
+
             const earnedStars = levelStars[level] || 0;
 
             return (
               <TouchableOpacity
                 key={level}
-                activeOpacity={isLocked ? 1 : 0.6}
+                disabled={isLocked}
+                activeOpacity={0.6}
                 onPress={() => handleLevelPress(level)}
                 style={[
                   styles.levelBox,
+                  {
+                    width: cellSize,
+                    height: cellSize,
+                  },
                   isUnlocked && styles.boxUnlocked,
                   isCurrent && styles.boxCurrent,
                   isLocked && styles.boxLocked,
@@ -146,7 +185,7 @@ export default function LevelSelection({ navigation }) {
             );
           })}
         </View>
-      </View>
+      </ScrollView>
 
       {/* STUDIO PAGINATION */}
       <View style={styles.pagination}>
@@ -168,6 +207,7 @@ export default function LevelSelection({ navigation }) {
 
         <View style={styles.pageIndicatorBox}>
           <Text style={styles.pageIndicator}>PAGE</Text>
+
           <Text style={styles.pageIndicatorNumber}>{currentPage + 1}</Text>
         </View>
 
@@ -194,11 +234,13 @@ export default function LevelSelection({ navigation }) {
   );
 }
 
-// ==========================================
-// ULTRA-PREMIUM NEON STYLESHEET
-// ==========================================
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#09090b", alignItems: "center" },
+  container: {
+    flex: 1,
+    backgroundColor: "#09090b",
+    alignItems: "center",
+  },
+
   loadingContainer: {
     flex: 1,
     backgroundColor: "#09090b",
@@ -206,7 +248,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
 
-  // Header
   header: {
     width: "100%",
     flexDirection: "row",
@@ -216,6 +257,7 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
     alignItems: "center",
   },
+
   iconBtn: {
     width: 45,
     height: 45,
@@ -226,36 +268,48 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#27272a",
   },
-  iconBtnText: { color: "#a1a1aa", fontSize: 18, fontWeight: "bold" },
+
+  iconBtnText: {
+    color: "#a1a1aa",
+    fontSize: 18,
+    fontWeight: "bold",
+  },
+
   titleText: {
     color: "#00f0ff",
     fontSize: 20,
     fontWeight: "900",
     letterSpacing: 4,
     textShadowColor: "rgba(0, 240, 255, 0.4)",
-    textShadowOffset: { width: 0, height: 0 },
+    textShadowOffset: {
+      width: 0,
+      height: 0,
+    },
     textShadowRadius: 10,
+    flexShrink: 1,
+    textAlign: "center",
   },
 
-  // Grid Sizing
-  gridWrapper: {
+  // Grid
+  gridScroll: {
     flex: 1,
     width: "100%",
+  },
+
+  gridWrapper: {
+    flexGrow: 1,
     justifyContent: "center",
     alignItems: "center",
+    paddingVertical: 20,
   },
+
   grid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    width: 350,
     justifyContent: "center",
-    gap: 14,
   },
 
-  // Premium Cyberpunk Grid Nodes
   levelBox: {
-    width: 58,
-    height: 60,
     justifyContent: "center",
     alignItems: "center",
     borderRadius: 16,
@@ -263,7 +317,11 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
 
-  boxUnlocked: { backgroundColor: "#121214", borderColor: "#27272a" },
+  boxUnlocked: {
+    backgroundColor: "#121214",
+    borderColor: "#27272a",
+  },
+
   boxCurrent: {
     backgroundColor: "rgba(0, 240, 255, 0.1)",
     borderColor: "#00f0ff",
@@ -272,7 +330,11 @@ const styles = StyleSheet.create({
     shadowRadius: 15,
     elevation: 10,
   },
-  boxLocked: { backgroundColor: "#0c0c0e", borderColor: "#18181b" },
+
+  boxLocked: {
+    backgroundColor: "#0c0c0e",
+    borderColor: "#18181b",
+  },
 
   levelNumber: {
     color: "#a1a1aa",
@@ -280,33 +342,40 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     letterSpacing: 0.5,
   },
+
   textCurrent: {
     color: "#ffffff",
     fontSize: 18,
     fontWeight: "900",
     textShadowColor: "#00f0ff",
-    textShadowOffset: { width: 0, height: 0 },
+    textShadowOffset: {
+      width: 0,
+      height: 0,
+    },
     textShadowRadius: 8,
   },
 
-  // Mini Stars inside level cell
   miniStarsRow: {
     flexDirection: "row",
     gap: 2,
     marginTop: 2,
   },
+
   miniStar: {
     fontSize: 9,
     color: "#27272a",
   },
+
   miniStarActive: {
     color: "#ffb703",
     textShadowColor: "rgba(251, 133, 0, 0.8)",
-    textShadowOffset: { width: 0, height: 0 },
+    textShadowOffset: {
+      width: 0,
+      height: 0,
+    },
     textShadowRadius: 4,
   },
 
-  // Geometric Vector Padlock
   lockContainer: {
     width: 20,
     height: 20,
@@ -314,6 +383,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     opacity: 0.25,
   },
+
   lockShackle: {
     width: 12,
     height: 10,
@@ -325,6 +395,7 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: 1,
   },
+
   lockBody: {
     width: 15,
     height: 11,
@@ -336,37 +407,47 @@ const styles = StyleSheet.create({
     bottom: 1,
   },
 
-  // Refined Pagination
   pagination: {
     flexDirection: "row",
     width: "100%",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: 40,
-    paddingBottom: 40,
+    paddingHorizontal: 20,
+    paddingBottom: 30,
+    gap: 8,
   },
+
   pageBtn: {
     paddingVertical: 15,
-    paddingHorizontal: 30,
+    paddingHorizontal: 20,
     borderRadius: 100,
     borderWidth: 1,
     borderColor: "#27272a",
     backgroundColor: "#121214",
+    alignItems: "center",
   },
+
   pageBtnDisabled: {
     borderColor: "#141416",
     backgroundColor: "transparent",
     opacity: 0.3,
   },
+
   pageBtnText: {
     color: "#ffffff",
     fontWeight: "900",
     letterSpacing: 2,
     fontSize: 12,
   },
-  pageTextDisabled: { color: "#52525b" },
 
-  pageIndicatorBox: { alignItems: "center" },
+  pageTextDisabled: {
+    color: "#52525b",
+  },
+
+  pageIndicatorBox: {
+    alignItems: "center",
+  },
+
   pageIndicator: {
     color: "#52525b",
     fontSize: 10,
@@ -374,6 +455,7 @@ const styles = StyleSheet.create({
     letterSpacing: 3,
     marginBottom: 2,
   },
+
   pageIndicatorNumber: {
     color: "#00f0ff",
     fontSize: 20,
