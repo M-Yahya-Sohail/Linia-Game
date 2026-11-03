@@ -47,5 +47,9 @@
     "eslint-config-expo": "~58.0.4",
     "typescript": "~6.0.3"
   },
-  "private": true
+  "private": true,
+  "optionalDependencies": {
+    "@emnapi/core": "1.11.3",
+    "@emnapi/runtime": "1.11.3"
+  }
 }
