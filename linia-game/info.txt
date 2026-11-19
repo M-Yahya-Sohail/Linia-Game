@@ -1,0 +1,235 @@
+This is a local, single-player puzzle game built with React Native and Expo. Its architecture is small: three screens handle navigation, one React Context owns shared progress and settings, and a standalone generator creates solvable puzzles. Gameplay rules, touch input, and board rendering live together in one screen.
+
+No files were modified. This explanation is based on source inspection; I did not run the app or builds.
+
+Application structure
+
+Expo AppEntry
+└── App.js
+    └── SafeAreaProvider
+        └── GameProvider
+            └── NavigationContainer
+                └── Native stack
+                    ├── MainMenu
+                    │   └── SettingsModal → PolicyModal
+                    ├── LevelSelection
+                    └── Gameplay
+                        ├── PauseMenu → PolicyModal
+                        ├── HowToPlayModal
+                        └── WinModal
+
+The active game lives under src/. The root components/, hooks/, and constants/ directories contain starter UI utilities that the game does not currently use.
+
+1. Entry point and navigation
+
+package.json (package.json) sets the entry point to node_modules/expo/AppEntry.js, which loads App.js (App.js).
+
+App.js establishes:
+
+- Safe-area handling for device edges and notches.
+- A shared GameProvider above every screen.
+- A React Navigation native stack with MainMenu, LevelSelection, and Gameplay.
+- Hidden navigation headers, fade transitions, disabled navigation gestures, and a light status bar.
+
+Navigation passes no level parameters. Screens read and update currentPlayingLevel through Context before navigating.
+
+Despite the README mentioning file-based routing, the active application uses React Navigation directly. There is no active Expo Router route tree.
+
+2. Shared state, persistence, and audio
+
+GameContext.js (src/context/GameContext.js) serves as the shared state and service layer.
+
+| State | Purpose | Persisted |
+|---|---|---|
+| highestUnlockedLevel | Controls which levels are accessible | Yes |
+| currentPlayingLevel | Identifies the selected game level | No |
+| levelStars | Maps each level to its best star rating | Yes |
+| isSoundOn | Controls game sounds | Yes |
+| isVibrationOn | Controls vibration feedback | Yes |
+| isLoaded | Indicates storage hydration has finished | No |
+
+Persistence uses AsyncStorage with separate keys matching the persisted state names.
+
+On startup, the provider loads saved progress and settings. It initializes currentPlayingLevel from the highest unlocked level, so a fresh launch resumes at the progression frontier rather than the last selected replay.
+
+Settings and highest-level changes are saved by an effect after hydration. saveLevelScore(level, stars) saves a rating only when it improves the previous best.
+
+The provider also owns two audio players:
+
+- assets/sounds/click.mp3
+- assets/sounds/win.mp3
+
+It initializes them through expo-audio, exposes playback functions through Context, and removes the players when the provider unmounts. Gameplay handles vibration directly through React Native’s Vibration API, excluding web.
+
+There is no backend, authentication, cloud synchronization, or remote level service in the inspected application.
+
+3. Screen responsibilities
+
+MainMenu.js (src/screens/MainMenu.js) is the landing screen. It provides Start Game, Select Level, and Settings actions. Its neon logo animation uses React Native Animated; settings visibility is local component state.
+
+LevelSelection.js (src/screens/LevelSelection.js) reads progress and stars from Context. It displays:
+
+- 25 levels per page in five columns.
+- Locked levels above highestUnlockedLevel.
+- The currently selected level and saved star ratings.
+- Pagination limited to pages containing unlocked levels.
+
+Selecting an unlocked level updates Context and navigates to Gameplay. This screen explicitly waits for isLoaded before showing the level grid.
+
+GamePlay.js (src/screens/GamePlay.js) is the main controller and renderer. It owns the generated board, player path, undo counter, pause/tutorial visibility, completion state, and earned stars.
+
+4. Procedural puzzle generation
+
+LevelGenerator.js (src/utils/LevelGenerator.js) exports generateLevel(levelNumber), which returns a two-dimensional numeric grid:
+
+| Value | Meaning |
+|---|---|
+| 0 | Playable node |
+| 1 | Blocked node |
+| 2 | Starting node |
+
+Generation works by constructing a valid solution first:
+
+1. Choose board dimensions from a sequence starting at 3 × 3 and reaching 6 × 4.
+2. After the first ten levels, cycle through seven larger board sizes.
+3. Randomly choose a blocked-node count between roughly 10% and 35% of the board.
+4. Use randomized depth-first search with backtracking to build a continuous path covering the remaining nodes.
+5. Allow up to 40 attempts, each capped at 5,000 search steps.
+6. If search fails, construct a serpentine fallback path.
+7. Mark the path’s first cell as the start, its other cells as playable, and everything outside it as blocked.
+
+This guarantees a solution by construction. The solution itself is discarded; Gameplay receives only the grid.
+
+Levels are not seeded or saved. A level number controls dimensions, but generating that number again can produce a different puzzle. Stars therefore belong to the level number rather than a specific board layout.
+
+5. Gameplay rules and input
+
+Gameplay regenerates its board when the component mounts or currentPlayingLevel changes.
+
+The player’s path is stored as an ordered array of node identifiers:
+
+["0-1", "1-1", "1-2"]
+
+Every proposed move must satisfy these rules:
+
+- The cell is inside the grid.
+- The cell is playable.
+- The cell has not already been visited.
+- The first move selects the designated starting cell.
+- Later moves are orthogonally adjacent to the path’s endpoint.
+
+Adjacency uses Manhattan distance:
+
+Math.abs(lastRow - row) + Math.abs(lastCol - col) === 1
+
+The puzzle completes when the path length equals the number of nonblocked cells. There is no required endpoint beyond covering all playable cells.
+
+Input uses a PanResponder attached to the board container. It translates touch coordinates into rows and columns, accounting for the container’s padding.
+
+Two input behaviors are supported:
+
+- Touching or dragging across valid cells extends the path.
+- Tapping an earlier visited node truncates the path back to that node and counts as one undo.
+
+The rewind behavior waits for release and accepts only small finger movement, distinguishing a tap from a drag.
+
+6. React state and refs
+
+Gameplay deliberately keeps important values in both state and refs.
+
+- State drives visible rendering.
+- Refs give gesture callbacks immediate access to the current board, path, settings, and interaction locks.
+
+The PanResponder is created once. A touchHandlersRef is updated on every render so its callbacks invoke current handlers rather than retaining old render values.
+
+An isWinningRef immediately locks further moves once completion is detected. Other refs prevent board interaction while paused or while tutorial/win overlays are active.
+
+This is a manually coordinated interaction model; there is no separate game engine, reducer, or formal state machine.
+
+7. Rendering and presentation
+
+The board uses ordinary React Native View elements:
+
+- Rows contain fixed-size cells.
+- Nodes are styled circles.
+- Blocked nodes show crosses.
+- Path segments are positioned rectangular views connecting adjacent node centers.
+
+There is no canvas, SVG renderer, or physics engine.
+
+Cell size is calculated from screen width and column count, capped at 85 pixels. The progress bar displays visited playable nodes as a percentage of the total.
+
+The active game uses local StyleSheet definitions and hardcoded dark/neon colors. It does not consume the root theme utilities.
+
+8. Completion, scoring, and progression
+
+On completion, Gameplay:
+
+1. Locks further input.
+2. Calculates the star rating.
+3. Saves the best score through Context.
+4. Plays win feedback.
+5. Shows WinModal after 350 milliseconds.
+
+| Undo actions | Stars |
+|---|---|
+| 0 | 3 |
+| 1–2 | 2 |
+| 3 or more | 1 |
+
+Both the Undo button and a tap rewind increment the undo counter. A rewind counts once regardless of how many nodes it removes.
+
+There are two distinct reset behaviors:
+
+- The board Reset button clears the path and retains the undo count.
+- Restart from the pause menu clears both the path and undo count.
+
+Both retain the same generated board.
+
+The next level unlocks when the player chooses Next Level or Main Menu from the win modal, provided they completed the highest unlocked level. Saving stars and unlocking the next level are separate operations.
+
+9. Modal components
+
+The components under src/components/ provide overlays rather than navigation routes:
+
+| Component | Responsibility |
+|---|---|
+| SettingsModal | Sound/vibration toggles and policy access |
+| PauseMenu | Resume, restart, settings toggles, policy, and exit |
+| WinModal | Animated stars and progression actions |
+| HowToPlayModal | Three tutorial slides using bundled images |
+| PolicyModal | Locally embedded terms/privacy text |
+
+Gameplay supplies action callbacks to its modals. Settings and Pause also access Context directly to change global preferences.
+
+10. Configuration and build architecture
+
+app.json (app.json) configures the app as “Linia,” with portrait orientation, dark appearance, bundled icons/splash assets, the liniagame URL scheme, and com.linia.game native identifiers. It also declares Expo plugins, Android audio-related permissions, and static web output.
+
+metro.config.js (metro.config.js) uses Expo’s default Metro configuration and sets EXPO_ROUTER_DISABLE_RN_NAVIGATION_CHECK. The npm launch scripts set the same variable.
+
+eas.json (eas.json) defines:
+
+- Development: internal development-client builds.
+- Preview: internal distribution, with Android APK output.
+- Production: Android App Bundle output and automatic version increments.
+
+The manifest declares Expo ^58.0.22, React 19.3.0, and React Native 0.88.1. These are declared dependencies; I did not verify installed compatibility.
+
+The application code is JavaScript. tsconfig.json enables strict checking for .ts and .tsx files, which primarily covers the starter utilities rather than the active game. ESLint uses Expo’s configuration. No test suite or test script appears in the inspected project.
+
+11. Starter code and architectural limitations
+
+The root UI utilities include themed text/views, collapsibles, platform icons, a parallax view, haptic tabs, and an external-link component. They form a disconnected starter component tree. Some reference expo-router, which is not declared in package.json.
+
+The README and reset-project.js also describe a Router starter structure rather than the current game architecture.
+
+Several current behaviors follow from the implementation:
+
+- Only Level Selection gates interaction on storage hydration; Start Game can open Gameplay before saved progress finishes loading.
+- An unfinished board and its path are not persisted across app restarts.
+- Re-entering a newly mounted Gameplay screen can generate a different board for the same level.
+- Storage writes are asynchronous and generally lack explicit failure handling.
+- Most gameplay responsibilities are concentrated in GamePlay.js, coupling input, rules, scoring, rendering, and progression.
+
+The clearest separation is between shared persistent state in GameContext, puzzle construction in LevelGenerator, and interactive game execution in GamePlay.
